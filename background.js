@@ -1,6 +1,11 @@
-// Just IG Image Downloader background script (v2.8)
+// Just IG Image Downloader background script (v3.0)
 // Per-tab video cache: Map<tabId, Map<videoHash, {url, ts}>>
 const tabGroups = new Map();
+
+// 分頁關閉時釋放對應快取，避免長時間使用累積記憶體
+chrome.tabs.onRemoved.addListener((tabId) => {
+  tabGroups.delete(tabId);
+});
 
 // Helper to decode efg param from IG
 function decodeEfg(str) {
@@ -18,7 +23,9 @@ function isAudioOnly(url) {
   try {
     const efg = new URL(url).searchParams.get('efg');
     if (!efg) return false;
-    const tag = (decodeEfg(efg).vencod_tag ?? '').toLowerCase();
+    // IG 實際使用的鍵名是 vencode_tag，但保留舊拼法以防回退
+    const decoded = decodeEfg(efg);
+    const tag = (decoded.vencode_tag ?? decoded.vencod_tag ?? '').toLowerCase();
     return tag.includes('audio') || tag.includes('heaac');
   } catch {
     return false;

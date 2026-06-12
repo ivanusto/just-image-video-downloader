@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    width: 260px;
+    margin: 0;
+    padding: 16px;
+    background: #1a1a1a;
+    color: #f5f5f5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+    font-size: 13px;
+  }
+  h1 {
+    font-size: 14px;
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h1 .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #0095f6;
+  }
+  .section { margin-bottom: 16px; }
+  .label { color: #a8a8a8; margin-bottom: 8px; }
+  .corner-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .corner-grid button {
+    padding: 10px 0;
+    background: #262626;
+    color: #f5f5f5;
+    border: 1px solid #363636;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s ease;
+  }
+  .corner-grid button:hover { border-color: #555; }
+  .corner-grid button.active {
+    background: #0095f6;
+    border-color: #0095f6;
+    font-weight: 600;
+  }
+  input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    background: #262626;
+    color: #f5f5f5;
+    border: 1px solid #363636;
+    border-radius: 8px;
+    font-size: 12px;
+    outline: none;
+  }
+  input[type="text"]:focus { border-color: #0095f6; }
+  .hint { color: #737373; font-size: 11px; margin-top: 6px; line-height: 1.5; }
+  .hint code {
+    background: #262626;
+    padding: 1px 4px;
+    border-radius: 4px;
+  }
+  .preview {
+    margin-top: 8px;
+    color: #0095f6;
+    font-size: 11px;
+    word-break: break-all;
+  }
+  .saved {
+    color: #2ecc71;
+    font-size: 11px;
+    text-align: right;
+    height: 14px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .saved.show { opacity: 1; }
+</style>
+</head>
+<body>
+  <h1><span class="dot"></span>Just IG Downloader 設定</h1>
+
+  <div class="section">
+    <div class="label">下載按鈕位置（貼文/Reels）</div>
+    <div class="corner-grid" id="corner-grid">
+      <button data-corner="top-left">左上</button>
+      <button data-corner="top-right">右上</button>
+      <button data-corner="bottom-left">左下</button>
+      <button data-corner="bottom-right">右下</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="label">檔名格式</div>
+    <input type="text" id="filename-template" spellcheck="false">
+    <div class="hint">可用變數：<code>{username}</code> <code>{type}</code> <code>{timestamp}</code></div>
+    <div class="preview" id="filename-preview"></div>
+  </div>
+
+  <div class="saved" id="saved-msg">✓ 已儲存</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
