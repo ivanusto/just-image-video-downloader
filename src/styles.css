@@ -1,47 +1,146 @@
-/* Premium Styles for Just IG Image Downloader v2.8 */
+/* Premium Styles for Just IG Image Downloader v3.0 */
 
+/* 按鈕放在媒體左上角：避開 IG 右上角的輪播頁數標示（1/N）、
+   探索頁縮圖的媒體類型圖示，以及影片右下角的靜音鈕 */
 .ig-download-btn {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   position: absolute !important;
   top: 12px !important;
-  right: 12px !important;
+  left: 12px !important;
+  right: auto !important;
+  bottom: auto !important;
   width: 36px !important;
   height: 36px !important;
-  background: rgba(15, 15, 15, 0.75) !important;
-  backdrop-filter: blur(10px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: #0095f6 !important; /* IG 品牌藍，醒目且永遠顯示 */
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
   border-radius: 50% !important;
   color: #ffffff !important;
   cursor: pointer !important;
   z-index: 9999 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   padding: 0 !important;
   outline: none !important;
 }
+/* 注意：不要用「父元素 :hover 才顯示」的做法——IG 現在的貼文結構
+   會在媒體上蓋一層兄弟節點遮罩，父元素吃不到 hover，按鈕會永遠隱藏 */
 
-/* Show when parent is hovered */
-:hover > .ig-download-btn {
-  opacity: 1 !important;
-  pointer-events: auto !important;
+/* 按鈕角落位置（由設定頁選擇，預設左上） */
+.ig-download-btn[data-corner="top-right"] {
+  top: 12px !important;
+  right: 12px !important;
+  left: auto !important;
+  bottom: auto !important;
 }
 
-/* Stories fixed button remains always visible */
-body > .ig-download-btn {
+.ig-download-btn[data-corner="bottom-left"] {
+  top: auto !important;
+  bottom: 12px !important;
+  left: 12px !important;
+  right: auto !important;
+}
+
+.ig-download-btn[data-corner="bottom-right"] {
+  top: auto !important;
+  bottom: 12px !important;
+  right: 12px !important;
+  left: auto !important;
+}
+
+/* 下方角落時 tooltip 改彈向上方，避免被容器裁切 */
+.ig-download-btn[data-corner="bottom-left"] .tooltip,
+.ig-download-btn[data-corner="bottom-right"] .tooltip {
+  top: auto !important;
+  bottom: calc(100% + 8px) !important;
+}
+
+/* 限時動態固定按鈕：靠視窗右側中下方，永遠顯示。
+   避開限動卡片右下角的愛心/分享/回覆列與右上角的暫停/靜音/選單 */
+.ig-download-btn--story {
+  position: fixed !important;
+  top: auto !important;
+  left: auto !important;
+  right: 24px !important;
+  bottom: 120px !important;
+  width: 44px !important;
+  height: 44px !important;
   opacity: 1 !important;
   pointer-events: auto !important;
+  z-index: 2147483647 !important;
+}
+
+.ig-download-btn--story svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+/* 限時動態按鈕的 tooltip 顯示在按鈕左側，避免超出視窗 */
+.ig-download-btn--story .tooltip {
+  top: 50% !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: calc(100% + 10px) !important;
+  transform: translateY(-50%) scale(0.8) !important;
+}
+
+.ig-download-btn--story .tooltip.show {
+  transform: translateY(-50%) scale(1) !important;
+}
+
+/* 貼文頁「一鍵下載全部圖片」藥丸按鈕：固定於視窗右側中下方
+   （與限動按鈕同位置，兩種頁面不會同時出現） */
+.ig-download-btn--all {
+  position: fixed !important;
+  top: auto !important;
+  left: auto !important;
+  right: 24px !important;
+  bottom: 120px !important;
+  width: auto !important;
+  height: 44px !important;
+  padding: 0 16px 0 12px !important;
+  border-radius: 22px !important;
+  gap: 7px !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 2147483647 !important;
+}
+
+.ig-download-btn--all svg {
+  width: 20px !important;
+  height: 20px !important;
+  flex-shrink: 0 !important;
+}
+
+.ig-download-btn--all .all-label {
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif !important;
+  white-space: nowrap !important;
+}
+
+/* 批次按鈕 tooltip 也顯示在左側 */
+.ig-download-btn--all .tooltip {
+  top: 50% !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: calc(100% + 10px) !important;
+  transform: translateY(-50%) scale(0.8) !important;
+}
+
+.ig-download-btn--all .tooltip.show {
+  transform: translateY(-50%) scale(1) !important;
 }
 
 .ig-download-btn:hover {
   transform: scale(1.1) !important;
-  background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045) !important;
-  border-color: rgba(255, 255, 255, 0.4) !important;
-  box-shadow: 0 6px 16px rgba(253, 29, 29, 0.4) !important;
+  background: #1877f2 !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 6px 16px rgba(0, 149, 246, 0.5) !important;
 }
 
 .ig-download-btn:active {
@@ -60,9 +159,11 @@ body > .ig-download-btn {
 }
 
 /* Tooltip styles */
+/* 顯示在按鈕下方：按鈕位於媒體頂端，往上彈會被容器 overflow 裁切 */
 .ig-download-btn .tooltip {
   position: absolute !important;
-  bottom: calc(100% + 8px) !important;
+  top: calc(100% + 8px) !important;
+  bottom: auto !important;
   left: 50% !important;
   transform: translateX(-50%) scale(0.8) !important;
   background: rgba(20, 20, 20, 0.95) !important;
