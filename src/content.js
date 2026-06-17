@@ -1,6 +1,14 @@
 // Just IG Image Downloader content script (v3.0)
 const chromeAPI = typeof browser !== 'undefined' ? browser : chrome;
 
+// 平台偵測：同一支腳本同時支援 Instagram 與 Threads。
+// 兩者都是 Meta 的 React SPA，圖片/影片共用 cdninstagram / fbcdn CDN，
+// 下載核心（解析網址 → blob → background 下載）完全共用；
+// IG 專屬功能（media info API、限時動態、一鍵下載全部）以 IS_IG 包起來。
+const HOST = location.hostname;
+const IS_IG = /(^|\.)instagram\.com$/i.test(HOST);
+const IS_THREADS = /(^|\.)threads\.(net|com)$/i.test(HOST);
+
 // 使用者設定（popup 可調整按鈕位置與檔名格式）
 const settings = {
   corner: 'top-left',
@@ -81,10 +89,34 @@ function getUsernameFromMedia(el) {
   return 'instagram';
 }
 
+// Threads 的作者帳號：貼文頁網址就是 /@username/post/code，最可靠；
+// 動態牆上各則貼文網址不變，改從媒體往上找最近含 a[href^="/@"] 的祖先。
+function getThreadsUsername(el) {
+  const m = location.pathname.match(/^\/@([A-Za-z0-9_.]+)/);
+  if (m) return m[1];
+
+  try {
+    let node = el;
+    for (let i = 0; i < 15 && node; i++) {
+      const link = node.querySelector?.('a[href^="/@"]');
+      if (link) {
+        const mm = link.getAttribute('href').match(/^\/@([A-Za-z0-9_.]+)/);
+        if (mm) return mm[1];
+      }
+      node = node.parentElement;
+    }
+  } catch (e) {}
+  return 'threads';
+}
+
 // 產生檔案名稱（預設格式: {username}_{type}_{timestamp}.{ext}，可由設定頁調整）
-// 帳號名稱優先用 media info API：單篇貼文頁（/p/...）沒有 <article> 包裹，
+// IG 帳號名稱優先用 media info API：單篇貼文頁（/p/...）沒有 <article> 包裹，
 // DOM 推斷會誤抓左側導覽列「自己」的個人連結，API 才拿得到真正的作者
 async function getFilename(el, ext) {
+  if (IS_THREADS) {
+    return buildFilename(getThreadsUsername(el), 'threads', ext);
+  }
+
   let username = null;
   const storyMatch = location.pathname.match(/^\/stories\/([^/]+)\//);
   if (storyMatch) {
@@ -286,10 +318,14 @@ async function downloadViaBlobContentScript(url, filename) {
 async function downloadImage(img) {
   try {
     let url = null;
-    const item = await fetchMediaInfo(findMediaId(img));
-    if (item) {
-      const target = getCarouselItem(item, img);
-      url = pickBestVersion(target?.image_versions2?.candidates);
+    // IG 才有 media info API（取原始解析度 + 精準對應輪播那張）；
+    // Threads 沒有等價 REST API，直接用 srcset 取最高解析度。
+    if (IS_IG) {
+      const item = await fetchMediaInfo(findMediaId(img));
+      if (item) {
+        const target = getCarouselItem(item, img);
+        url = pickBestVersion(target?.image_versions2?.candidates);
+      }
     }
     if (!url) url = getBestImageUrl(img);
     const filename = await getFilename(img, getImageExt(url));
@@ -351,8 +387,8 @@ async function downloadVideo(video) {
       }
     }
 
-    // 2. 其次呼叫 IG 的 Web API
-    if (!url) {
+    // 2. 其次呼叫 IG 的 Web API（Threads 無此 API，略過直接走 CDN 攔截）
+    if (!url && IS_IG) {
       const mediaId = findMediaId(video);
       if (mediaId) {
         url = await fetchVideoUrlFromApi(mediaId, video);
@@ -586,14 +622,14 @@ function addDownloadButtonToVideo(video) {
 
 // 增加下載按鈕到所有媒體元素（採用 size Heuristics 配合 class fallback 避免 IG 動態變更類名）
 function addDownloadButtons() {
-  // 限時動態頁面：加一顆固定按鈕，媒體在點擊當下才解析
-  if (/^\/stories\//.test(location.pathname)) {
+  // 限時動態頁面：加一顆固定按鈕，媒體在點擊當下才解析（IG 專屬，Threads 無限動）
+  if (IS_IG && /^\/stories\//.test(location.pathname)) {
     if (findStoryMedia()) addStoryButton();
     return;
   }
 
-  // 貼文頁（從用戶頁點進或彈窗開啟）：提供一鍵下載全部圖片
-  if (/^\/p\//.test(location.pathname)) addDownloadAllButton();
+  // 貼文頁（從用戶頁點進或彈窗開啟）：提供一鍵下載全部圖片（IG 專屬，依賴 media info API）
+  if (IS_IG && /^\/p\//.test(location.pathname)) addDownloadAllButton();
 
   // 先處理影片
   const videos = document.querySelectorAll('video');

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Just IG Image & Video Downloader",
   "version": "3.1",
-  "description": "Download Instagram images and videos with a simple click. Support photos, videos, reels and stories",
+  "description": "Download Instagram and Threads images and videos with a simple click. Support photos, videos, reels and stories",
   "icons": {
     "48": "icons/icon48.png",
     "96": "icons/icon96.png",
@@ -21,7 +21,9 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.instagram.com/*"
+        "*://*.instagram.com/*",
+        "*://*.threads.net/*",
+        "*://*.threads.com/*"
       ],
       "js": [
         "src/content.js"
@@ -39,6 +41,8 @@
   ],
   "host_permissions": [
     "*://*.instagram.com/*",
+    "*://*.threads.net/*",
+    "*://*.threads.com/*",
     "*://*.cdninstagram.com/*",
     "*://*.fbcdn.net/*"
   ]
