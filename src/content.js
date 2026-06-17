@@ -588,16 +588,31 @@ async function addDownloadAllButton() {
 
 // 增加下載按鈕到圖片元素
 function addDownloadButtonToElement(img) {
-  if (!img.parentElement || img.parentElement.querySelector('.ig-download-btn')) return;
+  if (!img.parentElement) return;
   if (isProfilePicture(img)) return;
 
-  const btn = createDownloadButton(() => downloadImage(img));
-
-  const container = img.parentElement;
-  if (getComputedStyle(container).position === 'static') {
-    container.style.position = 'relative';
+  // 決定按鈕的掛載容器，且不破壞網站既有版面。
+  // Threads 輪播的圖片是「絕對定位」、以某個高度正常的祖先為定位基準；
+  // 若把它的直接父層強制改成 relative，圖片會改用高度為 0 的父層當基準而塌掉變黑
+  // （下載仍正常，因為 srcset 還在，只是頁面預覽變黑）。
+  // 因此對絕對定位的圖片，直接把按鈕掛到它真正的定位基準（offsetParent），不動任何 position。
+  let container;
+  const imgPos = getComputedStyle(img).position;
+  if (imgPos === 'absolute' || imgPos === 'fixed') {
+    container = img.offsetParent;
+    if (!container || container === document.body || container === document.documentElement) {
+      container = img.parentElement; // 後備：找不到合適的定位基準時退回父層
+    }
+  } else {
+    // 一般文件流的圖片（IG 貼文圖即如此）：父層改 relative 無害，給按鈕一個定位基準
+    container = img.parentElement;
+    if (getComputedStyle(container).position === 'static') {
+      container.style.position = 'relative';
+    }
   }
-  container.appendChild(btn);
+
+  if (container.querySelector(':scope > .ig-download-btn')) return;
+  container.appendChild(createDownloadButton(() => downloadImage(img)));
 }
 
 // 增加下載按鈕到影片元素
