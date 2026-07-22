@@ -1,6 +1,12 @@
 # Build output (automatically generated via build.js)
 /dist/
 
+# Store publishing credentials (CWS OAuth / AMO JWT) — never commit
+publish.config.json
+
+# Claude Code local settings
+.claude/
+
 # OS metadata files
 .DS_Store
 Thumbs.db
