@@ -1,4 +1,4 @@
-// Just IG Image Downloader popup script (v3.0)
+// Just IG & Threads Image/Video Downloader — popup script
 const chromeAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 const DEFAULTS = {

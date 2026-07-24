@@ -1,4 +1,4 @@
-// Just IG Image Downloader background script (v3.0)
+// Just IG & Threads Image/Video Downloader — background service worker
 // Per-tab video cache: Map<tabId, Map<videoHash, {url, ts}>>
 const tabGroups = new Map();
 
@@ -70,6 +70,34 @@ chrome.webRequest.onBeforeRequest.addListener(
   { urls: ['*://*.cdninstagram.com/*', '*://*.fbcdn.net/*'] }
 );
 
+// 檔名安全網：chrome.downloads.download 對 blob: URL 在部分 Chrome 版本會忽略
+// filename 參數（Chromium 既有 bug，隨版本時好時壞），檔案會被存成 blob UUID
+// 之類的隨機英數名。這裡登記「下載 URL → 預期檔名」，再於 onDeterminingFilename
+// 強制套用；content script 的 <a download> 後備路徑亦透過 registerFilename 登記。
+const pendingNames = new Map(); // url -> { filename, ts }
+
+function registerPendingName(url, filename) {
+  if (!url || !filename) return;
+  const now = Date.now();
+  // 淘汰逾時項目：未觸發 onDeterminingFilename 的登記（如 Firefox）不能無限累積
+  for (const [k, v] of pendingNames) {
+    if (now - v.ts > 60000) pendingNames.delete(k);
+  }
+  pendingNames.set(url, { filename, ts: now });
+}
+
+// Firefox 沒有 onDeterminingFilename（其 downloads.download 檔名本就可靠），僅 Chrome 需要
+if (chrome.downloads.onDeterminingFilename) {
+  chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+    const p = pendingNames.get(item.url) ?? pendingNames.get(item.finalUrl);
+    if (p) {
+      pendingNames.delete(item.url);
+      pendingNames.delete(item.finalUrl);
+      suggest({ filename: p.filename, conflictAction: 'uniquify' });
+    }
+  });
+}
+
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender.tab?.id ?? -1;
@@ -92,7 +120,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return;
   }
 
+  if (message.action === 'registerFilename') {
+    registerPendingName(message.url, message.filename);
+    sendResponse({ ok: true });
+    return;
+  }
+
   if (message.action === 'download') {
+    registerPendingName(message.url, message.filename);
     chrome.downloads.download({
       url: message.url,
       filename: message.filename,

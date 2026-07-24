@@ -1,5 +1,19 @@
-// Just IG Image Downloader content script (v3.0)
+// Just IG & Threads Image/Video Downloader — content script
 const chromeAPI = typeof browser !== 'undefined' ? browser : chrome;
+
+// 跨檔共用的常數（popup.js 另有一份相同預設值；兩者執行於不同腳本環境，無法共享模組）
+const DEFAULT_FILENAME_TEMPLATE = '{username}_{type}_{timestamp}';
+// 檔名非法字元（Windows / macOS 皆涵蓋），下載前一律以底線取代
+const ILLEGAL_FILENAME_CHARS = /[<>:"/\\|?*\x00-\x1f]/g;
+
+// 簡單的 trailing debounce：連續觸發只在最後一次停止後執行一次
+function debounce(fn, wait) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), wait);
+  };
+}
 
 // 平台偵測：同一支腳本同時支援 Instagram 與 Threads。
 // 兩者都是 Meta 的 React SPA，圖片/影片共用 cdninstagram / fbcdn CDN，
@@ -12,8 +26,14 @@ const IS_THREADS = /(^|\.)threads\.(net|com)$/i.test(HOST);
 // 使用者設定（popup 可調整按鈕位置與檔名格式）
 const settings = {
   corner: 'top-left',
-  filenameTemplate: '{username}_{type}_{timestamp}'
+  filenameTemplate: DEFAULT_FILENAME_TEMPLATE
 };
+
+// 已下載紀錄：key 為 CDN 資產編號（同一媒體不論解析度/格式皆相同），
+// 檔名內含 timestamp、每次都不同，無法靠檔名判斷重複，必須用資產編號比對。
+// 存於 storage.local，跨分頁與瀏覽器重啟皆有效。
+const downloadedMedia = new Map(); // key -> { fn: 檔名, ts: 下載時間 }
+const DOWNLOADED_MAX = 800;
 
 try {
   chromeAPI.storage.local.get(settings).then(saved => {
@@ -21,10 +41,18 @@ try {
     document.querySelectorAll('.ig-download-btn:not(.ig-download-btn--story)')
       .forEach(b => b.setAttribute('data-corner', settings.corner));
   });
+  chromeAPI.storage.local.get({ downloadedMedia: {} }).then(({ downloadedMedia: saved }) => {
+    for (const [k, v] of Object.entries(saved)) {
+      if (!downloadedMedia.has(k)) downloadedMedia.set(k, v);
+    }
+  });
   chromeAPI.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     for (const [key, { newValue }] of Object.entries(changes)) {
       if (key in settings) settings[key] = newValue;
+      if (key === 'downloadedMedia' && newValue) {
+        for (const [k, v] of Object.entries(newValue)) downloadedMedia.set(k, v);
+      }
     }
     document.querySelectorAll('.ig-download-btn:not(.ig-download-btn--story)')
       .forEach(b => b.setAttribute('data-corner', settings.corner));
@@ -57,6 +85,49 @@ function igAssetStem(url) {
     return m ? m[1] : null;
   } catch (e) {}
   return null;
+}
+
+// 由下載網址推導重複比對用的 key：優先用資產編號，
+// 退而求其次用 CDN 路徑最後一段檔名（影片 mp4 的長雜湊名亦穩定）
+function mediaKey(url) {
+  if (!url || url.startsWith('blob:')) return null;
+  const stem = igAssetStem(url);
+  if (stem) return stem;
+  try {
+    const base = new URL(url, location.href).pathname.split('/').pop();
+    if (base) return base;
+  } catch (e) {}
+  return null;
+}
+
+// 寫入已下載紀錄（防抖合併寫入 storage；超量時淘汰最舊的）
+let persistDownloadedTimer = null;
+function recordDownload(key, filename) {
+  if (!key) return;
+  downloadedMedia.set(key, { fn: filename, ts: Date.now() });
+  while (downloadedMedia.size > DOWNLOADED_MAX) {
+    let oldestKey = null, oldestTs = Infinity;
+    for (const [k, v] of downloadedMedia) {
+      if ((v.ts ?? 0) < oldestTs) { oldestTs = v.ts ?? 0; oldestKey = k; }
+    }
+    downloadedMedia.delete(oldestKey);
+  }
+  clearTimeout(persistDownloadedTimer);
+  persistDownloadedTimer = setTimeout(() => {
+    try {
+      chromeAPI.storage.local.set({ downloadedMedia: Object.fromEntries(downloadedMedia) });
+    } catch (e) {}
+  }, 500);
+}
+
+// 重複下載時詢問使用者；回傳 true 表示仍要下載
+function confirmRedownload(key, kindLabel) {
+  const prev = downloadedMedia.get(key);
+  if (!prev) return true;
+  const when = prev.ts ? new Date(prev.ts).toLocaleString() : '先前';
+  return window.confirm(
+    `${kindLabel}之前已下載過\n（${when}，檔名：${prev.fn}）\n\n仍要再下載一次嗎？`
+  );
 }
 
 // 從 URL 偵測圖片副檔名（IG 現在會輸出 webp / heic 等格式）
@@ -139,11 +210,11 @@ async function getFilename(el, ext) {
 // 套用檔名樣板（批次下載會帶序號 suffix，如 _01、_02）
 function buildFilename(username, type, ext, suffix = '') {
   const timestamp = new Date().toISOString().replace(/[:.-]/g, '').slice(0, -4);
-  const name = ((settings.filenameTemplate || '{username}_{type}_{timestamp}')
+  const name = ((settings.filenameTemplate || DEFAULT_FILENAME_TEMPLATE)
     .replace(/\{username\}/g, username)
     .replace(/\{type\}/g, type)
     .replace(/\{timestamp\}/g, timestamp) + suffix)
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_'); // 移除檔名非法字元
+    .replace(ILLEGAL_FILENAME_CHARS, '_'); // 移除檔名非法字元
   return `${name}.${ext}`;
 }
 
@@ -272,47 +343,6 @@ async function fetchVideoUrlFromCdn(video) {
   }
 }
 
-// 網頁端 Fetch-to-Blob 下載後備方法
-async function downloadViaBlobContentScript(url, filename) {
-  try {
-    const response = await fetch(url, {
-      mode: 'cors',
-      credentials: 'include'
-    });
-    if (!response.ok) throw new Error('Fetch failed in content script');
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-
-    // 優先：透過 background 下載 blob 網址以管理檔名與歷史紀錄
-    try {
-      const res = await chromeAPI.runtime.sendMessage({
-        action: 'download',
-        url: blobUrl,
-        filename: filename
-      });
-      if (res && res.success) {
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-        return true;
-      }
-    } catch (e) {
-      console.warn('Background blob download failed, falling back to direct anchor click...');
-    }
-
-    // 後備：在網頁直接使用 <a> 標籤觸發下載
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-    return true;
-  } catch (error) {
-    console.error('Content script blob download failed:', error);
-    return false;
-  }
-}
-
 // 圖片下載（點擊當下才解析最佳網址，避免輪播切換後抓到舊圖）
 // 優先用 media info API 的原始解析度圖（srcset 通常最高只有 1080p）
 async function downloadImage(img) {
@@ -328,42 +358,53 @@ async function downloadImage(img) {
       }
     }
     if (!url) url = getBestImageUrl(img);
+
+    // 重複下載偵測：同一張圖（資產編號相同）已下載過就先詢問
+    const key = mediaKey(url);
+    if (key && downloadedMedia.has(key) && !confirmRedownload(key, '這張圖片')) {
+      return 'skipped';
+    }
+
     const filename = await getFilename(img, getImageExt(url));
-    return await downloadUrlToFile(url, filename);
+    const ok = await downloadViaBlob(url, filename);
+    if (ok) recordDownload(key, filename);
+    return ok;
   } catch (error) {
     console.error('Image download failed:', error);
     return false;
   }
 }
 
-// 在網頁端 fetch 圖片轉 blob 後交給 background 下載（最不易受 CORS / referer 阻擋）
-async function downloadUrlToFile(url, filename) {
+// 在網頁端 fetch 資源轉 blob 後交給 background 下載（最不易受 CORS / referer 阻擋）。
+// 圖片、批次下載與影片後備共用；fetch 不帶 credentials 以相容 CDN 的 ACAO:* 回應。
+async function downloadViaBlob(url, filename) {
   const response = await fetch(url);
-  if (!response.ok) throw new Error('Image fetch failed');
+  if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
   const blob = await response.blob();
   const blobUrl = URL.createObjectURL(blob);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 10000); // 留時間給 background / 瀏覽器讀取
 
-  // 優先使用擴充功能 background 下載，維持檔案結構
+  // 優先透過 background 下載 blob，維持檔名與下載紀錄
   try {
-    const res = await chromeAPI.runtime.sendMessage({
-      action: 'download',
-      url: blobUrl,
-      filename: filename
-    });
-    if (res && res.success) {
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-      return true;
-    }
-  } catch (e) {}
+    const res = await chromeAPI.runtime.sendMessage({ action: 'download', url: blobUrl, filename });
+    if (res?.success) return true;
+  } catch (e) {
+    console.warn('[IG-DL] background download failed, falling back to anchor click');
+  }
 
-  // 後備 direct click
+  // 後備：在網頁直接以 <a download> 觸發。
+  // 先向 background 登記 blob URL 對應檔名——部分 Chrome 版本會忽略
+  // <a download> 的檔名而存成 blob UUID 隨機名，由 background 的
+  // onDeterminingFilename 強制套回正確檔名
+  try {
+    await chromeAPI.runtime.sendMessage({ action: 'registerFilename', url: blobUrl, filename });
+  } catch (e) { /* background 不可用時仍嘗試 anchor 下載 */ }
   const a = document.createElement('a');
   a.href = blobUrl;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+  a.remove();
   return true;
 }
 
@@ -405,6 +446,12 @@ async function downloadVideo(video) {
       return false;
     }
 
+    // 重複下載偵測：同一部影片已下載過就先詢問
+    const key = mediaKey(url);
+    if (key && downloadedMedia.has(key) && !confirmRedownload(key, '這部影片')) {
+      return 'skipped';
+    }
+
     const filename = await getFilename(video, 'mp4');
 
     // 優先：透過 background 直接下載
@@ -415,12 +462,15 @@ async function downloadVideo(video) {
     });
 
     if (res && res.success) {
+      recordDownload(key, filename);
       return true;
     }
 
-    // 後備：如果直接下載失敗（通常是 CDN server 回傳 403 / 阻擋 referrer），使用 fetch-to-blob 下載
-    console.log('Direct download failed. Falling back to local blob fetch...');
-    return await downloadViaBlobContentScript(url, filename);
+    // 後備：直接下載失敗（多半是 CDN 回 403 / 擋 referrer），改用 fetch-to-blob
+    console.log('[IG-DL] direct download failed, falling back to blob fetch');
+    const ok = await downloadViaBlob(url, filename);
+    if (ok) recordDownload(key, filename);
+    return ok;
   } catch (error) {
     console.error('Video download failed:', error);
     return false;
@@ -472,6 +522,7 @@ function createDownloadButton(onClickHandler) {
     btn.classList.add('loading');
 
     // 任何未捕捉的例外都不能讓按鈕卡在 loading 狀態
+    // 回傳值：true 成功 / false 失敗 / 'skipped' 使用者在重複下載提示按了取消
     let success = false;
     try {
       success = await onClickHandler();
@@ -481,7 +532,8 @@ function createDownloadButton(onClickHandler) {
 
     btn.classList.remove('loading');
 
-    tooltip.textContent = success ? 'Downloaded!' : 'Failed';
+    tooltip.textContent = success === 'skipped' ? '已取消（重複）'
+      : success ? 'Downloaded!' : 'Failed';
     tooltip.classList.add('show');
     setTimeout(() => tooltip.classList.remove('show'), 2000);
   });
@@ -554,14 +606,36 @@ async function addDownloadAllButton() {
     let label = null;
 
     const btn = createDownloadButton(async () => {
-      let ok = 0;
+      // 批次前先盤點重複：已下載過的自動略過；若全部都下載過則詢問是否整批重下
+      const urls = imageItems.map(t => pickBestVersion(t.image_versions2.candidates));
+      const dupCount = urls.filter(u => {
+        const k = mediaKey(u);
+        return k && downloadedMedia.has(k);
+      }).length;
+      let force = false;
+      if (dupCount === total) {
+        if (!window.confirm(`這 ${total} 張圖片之前都已下載過，仍要全部重新下載嗎？`)) {
+          if (label) label.textContent = `全部 ${total} 張`;
+          return 'skipped';
+        }
+        force = true;
+      }
+
+      let ok = 0, skipped = 0;
       for (let i = 0; i < total; i++) {
         if (label) label.textContent = `${i + 1}/${total}`;
         try {
-          const url = pickBestVersion(imageItems[i].image_versions2.candidates);
+          const url = urls[i];
           if (url) {
+            const key = mediaKey(url);
+            if (!force && key && downloadedMedia.has(key)) {
+              skipped++;
+              continue; // 已下載過，略過（不需節流等待）
+            }
             const suffix = `_${String(i + 1).padStart(2, '0')}`;
-            await downloadUrlToFile(url, buildFilename(username, 'post', getImageExt(url), suffix));
+            const fn = buildFilename(username, 'post', getImageExt(url), suffix);
+            await downloadViaBlob(url, fn);
+            recordDownload(key, fn);
             ok++;
           }
         } catch (e) {
@@ -570,8 +644,10 @@ async function addDownloadAllButton() {
         // 連續下載間隔，避免被瀏覽器或 CDN 節流
         await new Promise(r => setTimeout(r, 300));
       }
-      if (label) label.textContent = `全部 ${total} 張`;
-      return ok === total;
+      if (label) {
+        label.textContent = skipped ? `新 ${ok}・略過 ${skipped}` : `全部 ${total} 張`;
+      }
+      return ok + skipped === total ? true : false;
     });
 
     btn.classList.add('ig-download-btn--all');
@@ -678,8 +754,10 @@ function addDownloadButtons() {
 // 就改為觸發該按鈕並阻止 IG 的播放/暫停處理。
 document.addEventListener('click', (e) => {
   if (!e.isTrusted) return; // 忽略程式觸發的合成事件，避免遞迴
+  if (e.target.closest?.('.ig-download-btn')) return; // 直接點到按鈕：交給按鈕自己的 handler（常見路徑，免去下方 layout 讀取）
+
+  // 點到覆蓋在按鈕上的 IG 透明遮罩：用座標比對找出被遮住的下載按鈕並代為觸發
   for (const btn of document.querySelectorAll('.ig-download-btn')) {
-    if (btn === e.target || btn.contains(e.target)) return; // 正常命中，交給按鈕自己的 handler
     const r = btn.getBoundingClientRect();
     if (r.width > 0 &&
         e.clientX >= r.left && e.clientX <= r.right &&
@@ -692,39 +770,26 @@ document.addEventListener('click', (e) => {
   }
 }, true);
 
-// SPA 路由變更偵測（網址改變時清除限動按鈕，並重新掃描）
-let lastUrl = window.location.href;
-new MutationObserver(() => {
-  const currentUrl = window.location.href;
-  if (currentUrl !== lastUrl) {
-    lastUrl = currentUrl;
-    document.querySelectorAll('body > .ig-download-btn').forEach(b => b.remove());
-    setTimeout(addDownloadButtons, 500);
-  }
-}).observe(document, { subtree: true, childList: true });
+// 滾動與 DOM 變動共用同一個 debounce 掃描器（trailing 300ms）
+const scheduleScan = debounce(addDownloadButtons, 300);
+window.addEventListener('scroll', scheduleScan, { passive: true });
+new MutationObserver(scheduleScan).observe(document.body, { childList: true, subtree: true });
 
-// 初始化：延遲以等待 React 渲染完成
-function init() {
-  setTimeout(addDownloadButtons, 1500);
+// SPA 路由變更偵測：換頁時移除固定按鈕（限動/批次）後重新掃描。
+// MutationObserver 捕捉 React 換頁；popstate 另外即時涵蓋上一頁/下一頁。
+let lastUrl = location.href;
+function onUrlMaybeChanged() {
+  if (location.href === lastUrl) return;
+  lastUrl = location.href;
+  document.querySelectorAll('body > .ig-download-btn').forEach(b => b.remove());
+  scheduleScan();
 }
+new MutationObserver(onUrlMaybeChanged).observe(document, { subtree: true, childList: true });
+window.addEventListener('popstate', onUrlMaybeChanged);
 
-// 滾動時掃描（防抖處理）
-let scrollTimeout;
-window.addEventListener('scroll', () => {
-  clearTimeout(scrollTimeout);
-  scrollTimeout = setTimeout(addDownloadButtons, 500);
-}, { passive: true });
-
-// DOM 結構改變觀察器
-let mutationTimeout;
-const observer = new MutationObserver(() => {
-  clearTimeout(mutationTimeout);
-  mutationTimeout = setTimeout(addDownloadButtons, 600);
-});
-
-observer.observe(document.body, {
-  childList: true,
-  subtree: true
-});
-
-init();
+// 初始化：立即掃一次，再分梯次補掃——React 首屏渲染完成時間不定，
+// 早到的媒體立刻有按鈕，晚到的靠補掃與 MutationObserver 接手
+addDownloadButtons();
+setTimeout(addDownloadButtons, 300);
+setTimeout(addDownloadButtons, 1000);
+setTimeout(addDownloadButtons, 2500);
