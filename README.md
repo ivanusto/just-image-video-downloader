@@ -1,78 +1,98 @@
 # Just IG & Threads Image/Video Downloader
 
-A lightweight Chrome & Firefox extension that adds a one‑click download button to images and videos on **Instagram** and **Threads** — photos, videos, Reels, Stories, and carousels.
+A lightweight, high-performance Chrome & Firefox extension (Manifest V3) that adds a convenient one‑click download button to images and videos on **Instagram** and **Threads** — photos, videos, Reels, Stories, and multi‑image carousels.
 
-No login, no third‑party servers, no data collection. Everything happens locally in your browser.
+No login, no third‑party servers, no data collection. Everything executes 100% locally in your browser.
 
-## Features
+---
 
-- 📸 **Images & videos** — download at the original resolution Instagram serves (not just the 1080p thumbnail).
-- 🎞️ **Reels & Stories** — a fixed button appears on Story view; resolves the currently visible media at click time.
-- 🖼️ **Carousels** — downloads the exact slide you're looking at, matched by CDN asset id (robust against Instagram's preloading offset).
-- ⬇️ **Batch download** — on a post page with multiple images, one button saves them all (numbered `_01`, `_02`, …).
-- 🧵 **Threads support** — the same engine works on `threads.net` / `threads.com`.
-- ⚙️ **Settings popup** — choose the button corner and customise the filename template.
+## ⚡ Key Features
 
-## Supported sites
+- 📸 **Original Quality Media** — Downloads photos and videos at the original, highest resolution served by Meta's CDN (bypassing compressed 1080p DOM previews).
+- 🛡️ **Duplicate Download Protection (New in v3.5)** — Automatically tracks previously downloaded assets (`igAssetStem`). Prompts with a confirmation dialog showing previous download timestamp & filename before re-downloading, preventing duplicate files from cluttering your storage.
+- 🐛 **Reliable Filenames (New in v3.5)** — Service worker filename mapping (`onDeterminingFilename`) prevents Chromium blob download bugs that cause random UUID filenames (`c032a188-...`).
+- ⬇️ **Smart Batch Download ("Download All")** — Save all carousel images from a multi-photo post at once with progressive index numbering (`_01`, `_02`, ...). Automatically skips previously saved slides unless forced.
+- 🎞️ **Reels & Stories Support** — Dedicated download pill for Instagram Stories and Reels that dynamically resolves the active visible media at click time.
+- 🖼️ **Accurate Carousel Matching** — Resolves exact carousel slide matching using CDN asset stems, immune to Instagram's hidden DOM preloading offsets.
+- 🧵 **Threads Integration** — Native support for downloading images and videos on `threads.net` and `threads.com`.
+- ⚙️ **Customizable Settings** — Choose button placement corner (Top-Left, Top-Right, Bottom-Left, Bottom-Right) and build custom filename templates using `{username}`, `{type}`, and `{timestamp}` tokens.
 
-- `instagram.com`
-- `threads.net`, `threads.com`
+---
 
-## Install
+## 🛍️ Store Listings & Installation
 
-### Store Links
-- **Chrome Web Store:** [Just IG & Threads Image/Video Downloader](https://chromewebstore.google.com/detail/jkfhcnhffglcmeolblidlogkjmcgpcja)
-- **Firefox Add-ons (AMO):** [Just IG & Threads Image/Video Downloader](https://addons.mozilla.org/firefox/addon/just-ig-threads-downloader/)
+### Official Stores
+- 🌐 **Chrome Web Store:** [Just IG & Threads Image/Video Downloader](https://chromewebstore.google.com/detail/jkfhcnhffglcmeolblidlogkjmcgpcja)
+- 🦊 **Firefox Add-ons (AMO):** [Just IG & Threads Image/Video Downloader](https://addons.mozilla.org/firefox/addon/just-ig-threads-downloader/)
 
-### Load unpacked (development / Chrome)
-1. Build the extension (see [Build](#build)) — output lands in `dist/chrome` and `dist/firefox`.
-2. **Chrome:** go to `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select `dist/chrome`.
-3. **Firefox:** go to `about:debugging` → **This Firefox** → **Load Temporary Add‑on**, and select `dist/firefox/manifest.json` (or install the packaged `.zip` via AMO).
+### Load Unpacked (Development / Manual Install)
+1. Clone or download this repository.
+2. Build the extension (see [Build](#-build)) — outputs land in `dist/chrome` and `dist/firefox`.
+3. **Chrome / Edge / Brave:**
+   - Navigate to `chrome://extensions`
+   - Enable **Developer mode** (top right)
+   - Click **Load unpacked** and select `dist/chrome`
+4. **Firefox:**
+   - Navigate to `about:debugging#/runtime/this-firefox`
+   - Click **Load Temporary Add-on...**
+   - Select `dist/firefox/manifest.json`
 
-## Build
+---
 
-Requires [Node.js](https://nodejs.org/) (no dependencies to install).
+## 🛠️ Build & Package
+
+Requires [Node.js](https://nodejs.org/) (no external dependencies required).
 
 ```bash
 node build.js
 ```
 
-This produces, under `dist/`:
+Running `build.js` produces under `dist/`:
+- `dist/chrome/` & `dist/firefox/` — Unpacked extension builds
+- `just-ig-threads-downloader-chrome-v<version>.zip` — Store-ready Chrome package
+- `just-ig-threads-downloader-firefox-v<version>.zip` — Store-ready Firefox package (with Firefox manifest Gecko ID configurations)
 
-- `dist/chrome/` and `dist/firefox/` — unpacked builds
-- `just-ig-threads-downloader-chrome-v<version>.zip`
-- `just-ig-threads-downloader-firefox-v<version>.zip` (with Firefox‑specific manifest tweaks)
+---
 
-The packager is a dependency‑free Node ZIP writer that always uses forward‑slash paths, so the archives are accepted by both the Chrome Web Store and AMO.
+## ⚙️ Extension Settings
 
-## Settings
+Click the extension icon in your browser toolbar to open the settings popup:
 
-Open the extension popup to configure:
+| Setting | Description | Default |
+|---------|-------------|---------|
+| **Button Position** | Choose which corner the download button sits in on posts & Reels (`top-left`, `top-right`, `bottom-left`, `bottom-right`). | `top-left` |
+| **Filename Template** | Pattern used for saved files. Available tokens: `{username}`, `{type}`, `{timestamp}`. | `{username}_{type}_{timestamp}` |
 
-| Setting | Description |
-|---------|-------------|
-| **Button position** | Which corner the download button sits in on posts / Reels (top‑left, top‑right, bottom‑left, bottom‑right). |
-| **Filename template** | Pattern for saved files. Variables: `{username}`, `{type}`, `{timestamp}`. Default: `{username}_{type}_{timestamp}`. |
+*Example filename output:* `instagram_user_post_2026-08-01_140000.jpg`
 
-## How it works
+---
 
-- A content script injects download buttons and, on Instagram, calls the public web media‑info API to resolve the original‑resolution asset and the correct carousel slide.
-- A background service worker intercepts CDN `.mp4` requests (per tab) as a fallback for resolving video URLs, and performs the actual download.
-- Media is fetched to a Blob in the page and handed to the browser's download manager, which sidesteps most CORS / referrer restrictions.
+## 🔍 How It Works
 
-## Privacy
+1. **Content Script Injection**: A content script injects high-visibility blue download buttons into media elements on Instagram and Threads.
+2. **Media Resolution**:
+   - **Instagram Posts**: Calls Instagram's public web media-info GraphQL / REST API to fetch maximum uncompressed resolution candidates (`image_versions2`).
+   - **Threads & Fallbacks**: Resolves via high-res DOM `srcset` or intercepting video CDN streams (`.mp4`).
+3. **Blob Downloading**: Media is fetched directly to a browser `Blob` and processed through `chrome.downloads`, bypassing CORS and referrer blocking.
+4. **Duplicate Protection**: Downloaded asset IDs are cached in `chrome.storage.local` to prevent accidental duplicate downloads.
 
-The extension collects **no** data. It talks only to Instagram/Threads and their CDNs (`cdninstagram.com`, `fbcdn.net`) to fetch the media you choose to download.
+---
 
-## Project structure
+## 🔒 Privacy Policy
 
-```
-manifest.json     Extension manifest (MV3)
-background.js     Service worker: CDN interception + downloads
-build.js          Dependency-free build & ZIP packager
-src/
-  content.js      Injects buttons, resolves & downloads media
-  popup.html/js   Settings UI
-  styles.css      Button styles
-icons/            Extension icons
-```
+This extension is **100% private and transparent**:
+- Collects **zero** user data, analytics, or tracking.
+- Communicates **only** directly with Instagram and Threads CDNs (`cdninstagram.com`, `fbcdn.net`) to fetch media files requested by the user.
+- Performs all media resolution and file saving locally in your browser.
+
+---
+
+## 📝 Recent Updates & Changelog
+
+- **v3.5**: Added Chromium blob filename fix, Duplicate Download Protection, smart batch skipping, and optimized DOM rendering scans.
+- **v3.3**: Refactored download core (`downloadViaBlob`), added performance improvements with `closest()`, updated documentation.
+- **v3.2**: Added full Threads (`threads.net`, `threads.com`) support and fixed layout rendering quirks.
+- **v3.1**: Redesigned UI with always-visible signature blue buttons, capture-phase click rescue, "Download All" batch mode, Stories support, and settings popup.
+
+For full version history details, see [`CHANGELOG.md`](CHANGELOG.md).
+For store review documentation and store descriptions, see [`CHROMEWEBSTORE.md`](CHROMEWEBSTORE.md).
