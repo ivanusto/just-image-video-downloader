@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="shared.css">
+<style>
+.logo-row { display: flex; align-items: center; gap: 22px; }
+.logo {
+  width: 72px; height: 72px; border-radius: 50%; flex: 0 0 72px;
+  background: radial-gradient(circle at 35% 30%, #3b82f6, #1d4ed8);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
+}
+.logo svg { width: 32px; height: 32px; }
+.post { left: 768px; top: 140px; width: 440px; height: 518px; }
+.img1 {
+  position: relative; height: 232px;
+  background: linear-gradient(120deg, #7c4dcc 0%, #9a6ad0 35%, #e8a13c 80%, #f5c04a 100%);
+}
+.sun {
+  position: absolute; right: 82px; top: 58px; width: 64px; height: 64px;
+  border-radius: 50%; background: #f7e8b0;
+  box-shadow: 0 0 40px 18px rgba(247, 232, 176, 0.45);
+}
+.img2 {
+  height: 172px;
+  background: linear-gradient(115deg, #b0508a 0%, #6a4fb0 40%, #23448f 75%, #1a3a80 100%);
+}
+.overlay-btn { position: absolute; left: 18px; top: 82px; }
+.cursor { position: absolute; left: 52px; top: 116px; }
+.tooltip {
+  position: absolute; left: 16px; top: 138px;
+  background: #0b111f; color: #fff; font-size: 15px; font-weight: 600;
+  padding: 9px 14px; border-radius: 8px; white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+}
+.post-footer {
+  display: flex; align-items: center; gap: 22px;
+  padding: 16px 18px; background: #0b111f; color: #c3cfdf; font-size: 15px;
+}
+</style></head>
+<body>
+  <div class="left">
+    <div class="logo-row">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12"/><path d="M6 11l6 6 6-6"/><path d="M4 21h16"/>
+        </svg>
+      </div>
+      <h1>Just Image &amp;<br>Video Downloader</h1>
+    </div>
+    <h2 class="sub">One-click original-quality image &amp; video downloads</h2>
+    <p class="body">A clean download button appears on every photo and video — just click to save. No setup, no accounts, no fuss.</p>
+    <div class="chips">
+      <span class="chip">📸 Original max quality</span>
+      <span class="chip">🔒 100% local</span>
+      <span class="chip">🚫 No login · No tracking</span>
+    </div>
+  </div>
+
+  <div class="card post">
+    <div class="card-header">
+      <div class="avatar" style="background: linear-gradient(135deg, #e879b9, #a855f7);"></div>
+      <span class="handle">sample_creator</span>
+    </div>
+    <div class="img1">
+      <div class="sun"></div>
+      <div class="overlay-btn">
+        <div class="dl-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12"/><path d="M6 11l6 6 6-6"/><path d="M4 21h16"/>
+          </svg>
+        </div>
+      </div>
+      <div class="cursor">
+        <svg width="24" height="24" viewBox="0 0 24 24">
+          <path d="M5 3l14 8-6.5 1.5L16 20l-3 1.2-3.4-7.4L5 17z" fill="#fff" stroke="#111" stroke-width="1.4"/>
+        </svg>
+      </div>
+      <div class="tooltip">Download image</div>
+    </div>
+    <div class="img2"></div>
+    <div class="post-footer">
+      <span>♡ 1,024</span><span>💬 88</span><span>↗ Share</span>
+    </div>
+  </div>
+</body></html>

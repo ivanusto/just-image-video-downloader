@@ -94,6 +94,8 @@ This extension is **100% private and transparent**:
 - Communicates **only** directly with the supported sites' CDNs to fetch media files requested by the user.
 - Performs all media resolution and file saving locally in your browser.
 
+Full policy: [`PRIVACY.md`](PRIVACY.md) — this is the privacy policy URL submitted to the Chrome Web Store and AMO listings.
+
 ---
 
 ## 📝 Recent Updates & Changelog

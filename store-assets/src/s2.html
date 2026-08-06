@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="shared.css">
+<style>
+.files { margin-top: 28px; display: flex; flex-direction: column; gap: 14px; width: 460px; }
+.file {
+  background: #101a2c; border: 1px solid #1e2b44; border-radius: 10px;
+  padding: 13px 16px; font-size: 15px; color: #dce7f5;
+  display: flex; gap: 10px; align-items: flex-start; line-height: 1.4;
+}
+.file .ok { color: #35c26a; }
+.file.skip { color: #77869c; }
+.file.skip .name { color: #77869c; }
+.post { left: 752px; top: 184px; width: 456px; height: 428px; }
+.img {
+  position: relative; height: 358px;
+  background: radial-gradient(circle at 30% 35%, #3f7fd4 0%, transparent 55%),
+              radial-gradient(circle at 75% 55%, #35b57a 0%, transparent 55%),
+              linear-gradient(135deg, #1d4ed8 0%, #1d8a63 100%);
+}
+.count-badge {
+  position: absolute; right: 16px; top: 16px;
+  background: rgba(10, 15, 28, 0.75); border-radius: 999px;
+  padding: 6px 14px; font-size: 14px; font-weight: 600;
+}
+.overlay-btn { position: absolute; left: 18px; top: 18px; }
+.dots { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 7px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.45); }
+.dot.on { background: #fff; }
+.dl-all {
+  position: absolute; right: 16px; bottom: 62px;
+  background: #2563eb; color: #fff; font-size: 17px; font-weight: 700;
+  border-radius: 999px; padding: 14px 26px;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.4);
+}
+.dl-all svg { width: 18px; height: 18px; }
+.toast {
+  position: absolute; left: 1004px; top: 552px; width: 228px;
+  background: #0b111f; border-radius: 12px; padding: 14px 16px;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.5); z-index: 5;
+}
+.toast .t-label { font-size: 15px; font-weight: 600; }
+.toast .bar { margin-top: 10px; height: 6px; border-radius: 3px; background: #24314a; overflow: hidden; }
+.toast .fill { height: 100%; width: 66%; background: #3b82f6; border-radius: 3px; }
+</style></head>
+<body>
+  <div class="left">
+    <h1>⬇️ One-Click Batch Download</h1>
+    <h2 class="sub">Download All — grab the whole carousel</h2>
+    <p class="body">Save every image in a multi-photo post at once, auto-numbered in order (_01, _02…) with live progress. Items you already downloaded are skipped automatically.</p>
+    <div class="files">
+      <div class="file"><span class="ok">✓</span><span class="name mono">sample_creator_post_2026-08-01_01.jpg</span></div>
+      <div class="file"><span class="ok">✓</span><span class="name mono">sample_creator_post_2026-08-01_02.jpg</span></div>
+      <div class="file skip"><span>⏭</span><span class="name mono">sample_creator_post_2026-08-01_03.jpg (already downloaded — skipped)</span></div>
+      <div class="file"><span class="ok">✓</span><span class="name mono">sample_creator_post_2026-08-01_04.jpg</span></div>
+    </div>
+  </div>
+
+  <div class="card post">
+    <div class="card-header">
+      <div class="avatar" style="background: linear-gradient(135deg, #2dd4bf, #0e9488);"></div>
+      <span class="handle">sample_creator</span>
+    </div>
+    <div class="img">
+      <div class="overlay-btn">
+        <div class="dl-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12"/><path d="M6 11l6 6 6-6"/><path d="M4 21h16"/>
+          </svg>
+        </div>
+      </div>
+      <div class="count-badge">2 / 6</div>
+      <div class="dots">
+        <span class="dot"></span><span class="dot on"></span><span class="dot"></span>
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      </div>
+      <div class="dl-all">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12"/><path d="M6 11l6 6 6-6"/><path d="M4 21h16"/>
+        </svg>
+        Download All
+      </div>
+    </div>
+  </div>
+  <div class="toast">
+    <div class="t-label">Batch downloading… 4 / 6</div>
+    <div class="bar"><div class="fill"></div></div>
+  </div>
+</body></html>

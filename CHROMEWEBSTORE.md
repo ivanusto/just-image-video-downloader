@@ -4,6 +4,7 @@ This document serves as the single source of truth for store listing copy, metad
 
 - **Chrome Web Store (CWS):** (pending re-submission)
 - **Firefox Add-ons (AMO):** https://addons.mozilla.org/firefox/addon/just-ig-threads-downloader/ (listing rename pending)
+- **Privacy Policy URL (for both store listings):** https://github.com/ivanusto/just-image-video-downloader/blob/main/PRIVACY.md
 
 ---
 
