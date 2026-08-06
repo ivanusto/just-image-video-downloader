@@ -25,8 +25,8 @@ No login, no third-party servers, no data collection. Everything executes 100% l
 ## 🛍️ Store Listings & Installation
 
 ### Official Stores
-- 🌐 **Chrome Web Store:** pending re-submission under the new name
-- 🦊 **Firefox Add-ons (AMO):** [listing](https://addons.mozilla.org/firefox/addon/just-ig-threads-downloader/) (listing rename pending)
+- 🌐 **Chrome Web Store:** [Just Image & Video Downloader](https://chromewebstore.google.com/detail/agnjnaoiacjcdjpilmoddhgoeejbjdlp)
+- 🦊 **Firefox Add-ons (AMO):** [Just Image & Video Downloader](https://addons.mozilla.org/firefox/addon/just-image-video-downloader/)
 
 ### Load Unpacked (Development / Manual Install)
 1. Clone or download this repository.

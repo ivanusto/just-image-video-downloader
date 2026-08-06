@@ -2,8 +2,8 @@
 
 This document serves as the single source of truth for store listing copy, metadata, release notes, and store submissions for **Just Image & Video Downloader** across the Chrome Web Store (CWS) and Firefox Add-ons (AMO).
 
-- **Chrome Web Store (CWS):** (pending re-submission)
-- **Firefox Add-ons (AMO):** https://addons.mozilla.org/firefox/addon/just-ig-threads-downloader/ (listing rename pending)
+- **Chrome Web Store (CWS):** https://chromewebstore.google.com/detail/agnjnaoiacjcdjpilmoddhgoeejbjdlp (extension ID: `agnjnaoiacjcdjpilmoddhgoeejbjdlp`)
+- **Firefox Add-ons (AMO):** https://addons.mozilla.org/firefox/addon/just-image-video-downloader/
 - **Privacy Policy URL (for both store listings):** https://github.com/ivanusto/just-image-video-downloader/blob/main/PRIVACY.md
 
 ---
