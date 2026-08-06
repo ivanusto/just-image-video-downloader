@@ -159,7 +159,7 @@ function createZip(folder, zipPath) {
 
 const version = JSON.parse(fs.readFileSync(path.join(srcDir, 'manifest.json'), 'utf8')).version;
 for (const [name, dir] of [['chrome', chromeDir], ['firefox', firefoxDir]]) {
-  const zipPath = path.join(distDir, `just-ig-downloader-${name}-v${version}.zip`);
+  const zipPath = path.join(distDir, `just-image-video-downloader-${name}-v${version}.zip`);
   createZip(dir, zipPath);
   console.log(`Packaged: ${path.relative(srcDir, zipPath)}`);
 }

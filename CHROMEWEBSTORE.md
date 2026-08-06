@@ -1,149 +1,136 @@
-# Chrome Web Store & AMO Listing Metadata
+# Just Image & Video Downloader - Store Listing Documentation
 
-This document serves as the single source of truth for store listing copy, release notes, permissions justifications, and privacy declarations for **Just IG & Threads Image/Video Downloader** across **Google Chrome Web Store (CWS)** and **Mozilla Add-ons (AMO)**.
+This document serves as the single source of truth for store listing copy, metadata, release notes, and store submissions for **Just Image & Video Downloader** across the Chrome Web Store (CWS) and Firefox Add-ons (AMO).
 
-## Store Links
-- **Chrome Web Store**: [Just IG & Threads Image/Video Downloader](https://chromewebstore.google.com/detail/jkfhcnhffglcmeolblidlogkjmcgpcja)
-- **Firefox Add-ons (AMO)**: [Just IG & Threads Image/Video Downloader](https://addons.mozilla.org/firefox/addon/just-ig-threads-downloader/)
-
----
-
-## 1. Release Notes / Version History
-
-### Version 3.5 (Current Release)
-
-#### 繁體中文 (Traditional Chinese)
-```text
-【v3.5 更新說明】
-• 🐛 修復隨機檔名問題：修復 Chrome / Chromium 瀏覽器觸發 Blob 下載時偶爾出現隨機 UUID 檔名（例如 c032a188...）的 Bug。
-• 🛡️ 重複下載防護提示：自動紀錄已下載過的媒體，重複點擊時將跳出彈窗提醒並顯示先前下載時間與檔名，防止重複下載佔用空間。
-• ⚡ 一鍵批量下載升級：使用「下載全部」時自動跳過已下載過的圖片；若整批皆已下載過則提示是否強制重下。
-• 🚀 載入與按鈕反應優化：縮短掃描間隔並改進 React 頁面渲染監測，開啟頁面時下載按鈕出現速度更快。
-• 🧵 完整支援 Instagram & Threads 圖片、影片、Reels 與限時動態下載。
-```
-
-#### English
-```text
-[What's New in Version 3.5]
-• 🐛 Fixed Random Filename Bug: Resolved an issue in Chrome/Chromium where Blob downloads resulted in random UUID filenames (e.g. c032a188...).
-• 🛡️ Duplicate Download Protection: Automatically tracks downloaded media and prompts with a confirmation dialog (showing timestamp & filename) before re-downloading.
-• ⚡ Smart Batch Download: "Download All" now automatically skips previously saved items, saving bandwidth and time.
-• 🚀 Faster Button Rendering: Optimized DOM scanning intervals for faster button insertion on React-rendered pages.
-• 🧵 Complete support for Instagram & Threads photos, videos, Reels, and Stories.
-```
+- **Chrome Web Store (CWS):** (pending re-submission)
+- **Firefox Add-ons (AMO):** https://addons.mozilla.org/firefox/addon/just-ig-threads-downloader/ (listing rename pending)
 
 ---
 
-## 2. Google Chrome Web Store (CWS) Copy
+## Release Notes / 更新日誌 (v4.0)
 
-### Short Description (簡短說明 - 132字以內)
-- **Language**: Chinese (Traditional) / 繁體中文 (132 chars max)
-  ```text
-  一鍵下載 Instagram 與 Threads 的高畫質圖片、影片、Reels 與限時動態 (Stories)。無須登入、隱私安全、支援批量下載與自訂檔名。
-  ```
-- **Language**: English (132 chars max)
-  ```text
-  Download Instagram & Threads photos, videos, Reels, and Stories with 1 click. Max quality, batch download, no login required.
-  ```
+### 繁體中文
+- **全新名稱與全新視覺識別**：擴充套件正式更名為「Just Image & Video Downloader」，同步推出全新設計圖示與品牌藍配色。
+- **商店素材重製**：線上商店所有預覽圖與宣傳圖全面替換為原創示意圖，確保完全符合商店規範與品牌權益。
+- **完整保留 v3.5 強大核心功能與修復**：
+  - 功能與 v3.5 完全一致。
+  - 修正隨機 UUID 檔名問題，回復預設結構化檔名。
+  - 重複下載保護機制（記憶下載紀錄，重複時彈出對話框並顯示上次下載時間與檔名資訊）。
+  - 智慧批次跳過（自動跳過已下載過的項目）。
+  - 優化按鈕渲染速度與媒體偵測效能。
 
-### Detailed Description (詳細內容)
+### English
+- **New Brand Name & Visual Identity**: Officially renamed to "Just Image & Video Downloader", featuring a fresh logo and brand-blue visual identity.
+- **Redesigned Store Assets**: Store screenshots and store preview imagery redesigned to use original illustrative mockups in full compliance with store policies.
+- **Includes all v3.5 core features & fixes**:
+  - Unchanged core feature parity with v3.5.
+  - Resolved random UUID filename generation issue to restore predictable file naming.
+  - Duplicate download protection (remembers download history, displays confirmation popup showing previous download timestamp and filename).
+  - Smart batch skip mechanism (automatically skips previously saved files).
+  - Optimized button rendering speed and DOM media detection performance.
 
-#### 繁體中文 (Traditional Chinese)
-```text
-Just IG & Threads Image/Video Downloader 是一款輕巧且強大的瀏覽器擴充功能，為 Instagram 與 Threads 媒體提供流暢的一鍵下載體驗。
+---
 
-主要功能：
-• 📸 原圖與最高畫質下載：直接下載官方伺服器提供的最高解析度原檔（超越一般 1080p 縮圖）。
-• 🎞️ Reels & Stories 限時動態：限時動態與 Reels 頁面提供獨立下載按鈕，點擊即刻儲存當前媒體。
-• 🖼️ 輪播多圖精準下載：精準鎖定當前顯示的幻燈片頁數，絕不抓錯圖片。
-• ⬇️ 一鍵批量下載 (Download All)：在多圖貼文頁面可一鍵下載所有圖片，自動標號命名、自動跳過重複圖片並顯示下載進度。
-• 🛡️ 重複下載防護：自動比對已下載檔案，重複點擊時溫馨提醒，避免佔用硬碟空間。
-• 🧵 完整支援 Threads：全面相容 threads.net / threads.com 的圖片與影片下載。
-• ⚙️ 個人化設置：支援自訂下載按鈕位置（四個角落）與檔案命名格式（變數包含 {username}、{type}、{timestamp}）。
-• 🔒 100% 隱私保護：完全不收集任何個人資料、無須登入帳號、不經過任何第三方伺服器。
+## Chrome Web Store Short Description / 簡短描述
 
-使用說明：
-安裝後開啟 Instagram 或 Threads，在圖片或影片畫面上即可看到下載按鈕，點擊即完成儲存。
-```
+### 繁體中文 (Max 132 chars)
+一鍵下載最高畫質圖片與影片，支援多圖輪播批次下載、重複下載提醒與自訂檔名範本，100% 本地運作零追蹤。
 
-#### English
-```text
-Just IG & Threads Image/Video Downloader is a clean, fast, and feature-rich browser extension that adds one-click download buttons to Instagram and Threads.
+### English (Max 132 chars)
+One-click max-res image & video downloader with batch download, duplicate protection, custom file templates & 100% local privacy.
+
+---
+
+## Chrome Web Store Detailed Description / 詳細描述
+
+### 繁體中文
+Supported sites: instagram.com, threads.net, threads.com
+
+「Just Image & Video Downloader」是一款極簡、高效且重視隱私的媒體下載工具。無需登入即可一鍵儲存最高解析度的圖片、影片、短影音與限時動態，並支援多圖輪播批次下載。
+
+核心功能：
+- **一鍵輕鬆下載**：自動在媒體內容上注入下載按鈕，隨點隨存高畫質圖片與影片。
+- **最高解析度儲存**：自動取得並下載原始最高畫質檔案，不壓縮、不破壞品質。
+- **多圖輪播批次下載**：一鍵「全部下載」多圖輪播內的所有圖片與影片，自動加上序號編號（如 `_01`、`_02`）並即時顯示下載進度。
+- **精準輪播比對**：準確識別目前檢視的輪播幻燈片，確保下載內容與當前顯示完全一致。
+- **重複下載保護**：自動記錄已下載檔案，再次下載相同內容時彈出確認對話框，並提示上次下載時間與檔名，防止重複儲存。
+- **支援短影音與限時動態**：流暢擷取短影音與臨時限時動態媒體檔案。
+- **自訂按鈕位置**：支援將下載按鈕放置於媒體角落（提供 4 個角落可供選擇），符合個人操作習慣。
+- **自訂檔名範本**：支援使用 `{username}`、`{type}`、`{timestamp}` 等變數自由設定儲存檔名格式。
+- **100% 本地與隱私安全**：不需登入帳號、零追蹤碼，所有媒體解析與下載作業皆在瀏覽器本地端完成，絕不經過任何第三方伺服器。
+
+---
+
+### English
+Supported sites: instagram.com, threads.net, threads.com
+
+Just Image & Video Downloader is a clean, lightweight, and privacy-first browser extension designed for saving media seamlessly. Save maximum-resolution photos, videos, short videos, and stories with a single click, with no login required.
 
 Key Features:
-• 📸 Original Resolution Downloads: Fetches original max-resolution files directly from Meta's CDN (exceeding 1080p thumbnails).
-• 🎞️ Reels & Stories Support: Fixed download buttons for Stories and Reels that accurately capture the currently playing item.
-• 🖼️ Precise Carousel Matching: Downloads the exact slide currently visible on screen.
-• ⬇️ One-Click Batch Download: Download all carousel images from a multi-photo post at once with automatic index numbering (_01, _02...).
-• 🛡️ Duplicate Prevention: Remembers previously downloaded files and confirms before re-saving duplicate photos/videos.
-• 🧵 Threads Support: Seamlessly download photos and videos on threads.net and threads.com.
-• ⚙️ Customizable Settings: Change button placement (4 corners) and customize saved filename templates using {username}, {type}, and {timestamp}.
-• 🔒 Privacy Built-in: No tracking, no login, no third-party servers. All operations execute locally in your browser.
-
-How to use:
-Install the extension, visit Instagram or Threads, and click the blue download button on any post, Reel, or Story.
-```
+- **One-Click Download**: Injects clean, responsive download buttons directly onto media items for effortless saving.
+- **Original / Max Resolution**: Automatically retrieves and saves the original highest resolution photos and videos without quality loss.
+- **"Download All" Batch Download**: Effortlessly download all slides from multi-image carousel posts with automatic index numbering (`_01`, `_02`) and live progress tracking.
+- **Precise Carousel Slide Matching**: Accurately tracks current carousel slides to guarantee exact media downloads.
+- **Duplicate Download Protection**: Keeps track of downloaded media history and prompts a confirmation dialog with previous download timestamp and filename before re-downloading.
+- **Stories & Short Videos Support**: Save short videos and temporary story media effortlessly.
+- **Customizable Button Position**: Place download overlay buttons in any of the 4 corners of media cards according to your visual workflow.
+- **Custom Filename Templates**: Organize saved files using customizable tokens including `{username}`, `{type}`, and `{timestamp}`.
+- **100% Local & Privacy-Preserving**: No login required, no telemetry tracking, and zero remote third-party servers. All operations execute strictly inside your local browser.
 
 ---
 
-## 3. Mozilla Add-ons (AMO) Firefox Copy
+## AMO Listing (Firefox Add-ons)
 
-### Summary (簡短描述)
-- **繁體中文**:
-  ```text
-  一鍵輕鬆下載 Instagram 與 Threads 的高畫質圖片、影片、Reels 貼文與限時動態 (Stories)。無須登入、完全免費、無廣告且保護隱私。
-  ```
-- **English**:
-  ```text
-  One-click high-resolution image and video downloader for Instagram and Threads. Supports Photos, Videos, Reels, Stories, and Carousels. Free, fast, and 100% private.
-  ```
+### Summary / 摘要
 
-### Description (詳細描述)
-
-#### 繁體中文 (Traditional Chinese)
-```markdown
-【Just IG & Threads Image/Video Downloader】是一款輕量且強大的瀏覽器擴充功能，為 Instagram 與 Threads 媒體元素加入一鍵下載按鈕。
-
-✨ **核心特色功能**：
-• 📸 **原圖與高畫質影片下載**：直接獲取 Instagram/Threads 伺服器提供的最高解析度原檔，非壓縮後的 1080p 縮圖。
-• 🎞️ **Reels 與限時動態 (Stories)**：限時動態視窗右側提供固定下載按鈕，點擊即時解析當前播放中的動態媒體。
-• 🖼️ **多圖輪播 (Carousels)**：精準識別當前瀏覽的幻燈片，下載您眼睛所見的正確圖片。
-• ⬇️ **一鍵批量下載**：在多圖貼文頁面提供「下載全部」按鈕，依序自動命名標號（_01, _02...）、自動略過已下載項目並顯示下載進度。
-• 🛡️ **重複下載防護**：智慧記錄已下載媒體，防範重複下載佔用電腦硬碟容量。
-• 🧵 **完整支援 Threads**：全面支援 threads.net / threads.com 的圖片與影片下載。
-• ⚙️ **自訂設置面板**：支援調整下載按鈕位置（四角落）以及自訂檔名範本（支援 `{username}`、`{type}`、`{timestamp}` 變數）。
-• 🔒 **100% 隱私安全**：無須登入帳號、不經過第三方伺服器，所有下載操作皆在本地瀏覽器完成。
-
-💡 **使用方式**：
-安裝擴充功能後，瀏覽 Instagram 或 Threads 時，媒體角落將出現藍色下載按鈕，點擊即可開始下載。
-```
+#### 繁體中文
+一鍵下載最高畫質圖片與影片，支援多圖輪播批次下載、重複下載提醒與自訂檔名範本，100% 本地運作零追蹤。
 
 #### English
-```markdown
-**Just IG & Threads Image/Video Downloader** is a lightweight, high-performance extension that adds convenient one-click download buttons to images and videos on **Instagram** and **Threads**.
-
-✨ **Key Features**:
-• 📸 **Original Quality Downloads**: Download images and videos at the highest resolution served by Instagram/Threads (beyond standard 1080p thumbnails).
-• 🎞️ **Reels & Stories Support**: Dedicated download button on Story and Reel overlays that dynamically resolves the currently active video/image.
-• 🖼️ **Accurate Carousel Downloads**: Downloads the exact slide you are looking at, avoiding preloading mismatch issues.
-• ⬇️ **One-Click Batch Download**: On multi-image post pages, click "Download All" to save every slide in order (`_01`, `_02`, ...) with live progress.
-• 🛡️ **Duplicate Download Protection**: Automatically remembers downloaded files and prompts for confirmation before saving duplicates.
-• 🧵 **Threads Integration**: Full support for `threads.net` and `threads.com` media downloading.
-• ⚙️ **Customizable Settings**: Choose button position (4 corners) and build custom file naming patterns using `{username}`, `{type}`, and `{timestamp}` tokens.
-• 🔒 **Privacy Focused**: No login required, no data collection, no third-party servers. 100% local browser execution.
-
-💡 **How to Use**:
-After installing, visit Instagram or Threads. A blue download button will appear over images and videos—simply click it to save.
-```
+One-click max-res image & video downloader with batch download, duplicate protection, custom file templates & 100% local privacy.
 
 ---
 
-## 4. Permissions & Privacy Justifications (for Reviewer)
+### Detailed Description / 詳細描述
 
-| Permission | Justification |
-|------------|---------------|
-| `downloads` | Required to trigger browser downloads for images and videos saved by the user. |
-| `webRequest` | Required to intercept media CDN requests (`.mp4`) as a fallback resolution method for videos. |
-| `alarms` | Used to manage periodic cleanup of tab-level video URL caches. |
-| `storage` | Required to save user preferences (button corner position and filename templates) and duplicate download records. |
-| `host_permissions` (`instagram.com`, `threads.net`, `threads.com`, `cdninstagram.com`, `fbcdn.net`) | Required to fetch media content directly into blobs for local download without CORS restrictions. |
+#### 繁體中文
+Supported sites: instagram.com, threads.net, threads.com
+
+「Just Image & Video Downloader」是一款專為瀏覽體驗打造的高效媒體下載擴充套件。具備直覺按鈕與強大批次下載功能，協助您輕鬆儲存圖片、影片、短影音與限時動態。
+
+重點特色：
+- **單鍵下載原圖與高清影片**：直接下載最高畫質媒體。
+- **多圖輪播「全部下載」**：自動給予索引編號（`_01`、`_02`）並顯示即時下載進度。
+- **重複下載提示**：顯示前次下載檔案名稱與時間紀錄，避免重覆下載。
+- **個體化彈性設定**：支援 4 角按鈕顯示位置調整，以及 `{username}`、`{type}`、`{timestamp}` 檔名命名規則。
+- **完全本地運作**：不需登入、無第三方伺服器傳輸，保護使用者資料隱私。
+
+#### English
+Supported sites: instagram.com, threads.net, threads.com
+
+Just Image & Video Downloader is a powerful, privacy-conscious add-on for saving web media. Download photos, videos, short videos, and stories effortlessly directly from your browser.
+
+Main Highlights:
+- **Instant High-Res Downloads**: Save original photos and videos at peak quality.
+- **Batch Carousel Downloads**: "Download All" feature automatically appends index tags (`_01`, `_02`) with live progress indicators.
+- **Duplicate Protection**: Alerts you before saving duplicate media, showing prior file names and timestamps.
+- **Flexible Customization**: Choose between 4 button corner placements and customize output filenames using `{username}`, `{type}`, and `{timestamp}`.
+- **Purely Local & Safe**: Requires no user login, uses no remote processing servers, and conducts 100% client-side operations.
+
+---
+
+## Permissions Justification Table
+
+| Permission / Host | Technical Purpose & Store Justification |
+| --- | --- |
+| `downloads` | Required to trigger user-initiated file downloads directly into the user's default downloads directory via the browser download manager API. |
+| `webRequest` | Intercepts media CDN `.mp4` network requests to extract video stream URLs as a robust fallback when media elements do not expose direct source URLs in the DOM. |
+| `alarms` | Used to schedule routine background memory cleanup tasks for tab-level cached video URLs, preventing memory leaks during long browsing sessions. |
+| `storage` | Stores user configuration settings (e.g., button placement options, filename format templates) and local history hash records for duplicate download protection. |
+| `host_permissions`<br>(`*://*.instagram.com/*`,<br>`*://*.threads.net/*`,<br>`*://*.threads.com/*`,<br>`*://*.cdninstagram.com/*`,<br>`*://*.fbcdn.net/*`) | Necessary for injecting download controls into web pages, reading image/video source metadata, fetching raw media files into Blob objects locally, and bypassing cross-origin (CORS) download restrictions for user-initiated saves. |
+
+---
+
+## Screenshot Policy
+
+All store screenshots, header images, and promotional graphics uploaded to the Chrome Web Store and Firefox Add-ons store listings are strictly original, generic illustrative mockups and graphic diagrams. No real third-party user interfaces, copyrighted page elements, or trademarked brand assets are depicted in any store promotional graphics.

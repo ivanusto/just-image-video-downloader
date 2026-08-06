@@ -1,4 +1,4 @@
-// Just IG & Threads Image/Video Downloader — content script
+// Just Image & Video Downloader — content script
 const chromeAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 // 跨檔共用的常數（popup.js 另有一份相同預設值；兩者執行於不同腳本環境，無法共享模組）

@@ -1,4 +1,4 @@
-// Just IG & Threads Image/Video Downloader — background service worker
+// Just Image & Video Downloader — background service worker
 // Per-tab video cache: Map<tabId, Map<videoHash, {url, ts}>>
 const tabGroups = new Map();
 

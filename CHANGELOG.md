@@ -1,9 +1,21 @@
 # Changelog
 
-All notable changes to the **Just IG & Threads Image/Video Downloader** project will be documented in this file.
+All notable changes to the **Just Image & Video Downloader** project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [4.0] - 2026-08-06
+
+### Changed
+- **Project Renamed**: Extension renamed from its previous trademark-conflicting name to **Just Image & Video Downloader**, following a Chrome Web Store brand-infringement notice. All user-visible strings, store listing copy, and package filenames updated; repository renamed to `just-image-video-downloader`.
+- **New Visual Identity**: Brand-new original icon (circular download-arrow badge) replacing the previous camera-style icon; UI accent color changed from `#0095f6` to an independent brand blue `#2563eb`.
+- **Original Store Assets**: All store screenshots replaced with original illustrative mockups (`store-assets/`) — no real third-party UI is depicted.
+
+### Unchanged
+- All functionality is identical to v3.5. Internal storage keys and the Firefox Gecko ID are intentionally preserved for seamless upgrades.
 
 ---
 

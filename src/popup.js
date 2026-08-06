@@ -1,4 +1,4 @@
-// Just IG & Threads Image/Video Downloader — popup script
+// Just Image & Video Downloader — popup script
 const chromeAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 const DEFAULTS = {

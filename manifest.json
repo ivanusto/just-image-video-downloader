@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Just IG & Threads Image/Video Downloader",
-  "version": "3.5",
-  "description": "Download Instagram and Threads images and videos with a simple click. Supports photos, videos, reels, and stories.",
+  "name": "Just Image & Video Downloader",
+  "version": "4.0",
+  "description": "One-click image & video downloader with original quality, batch download, duplicate protection, and custom filenames.",
   "icons": {
     "48": "icons/icon48.png",
     "96": "icons/icon96.png",
