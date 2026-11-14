@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.1] - 2026-11-14
+
+### Fixed
+- **Instagram media resolution after the 2026 API change**: Instagram started redirecting `/api/v1/media/<id>/info/` to the homepage for many sessions (from August 2026). When that happened the extension silently fell back to 1080p `srcset` images, guessed the author from the DOM, hid the "Download All" button, and saved story videos without audio. Media is now resolved through a fallback chain:
+  1. GraphQL `PolarisPostRootQuery` (`/graphql/query`, `fb_dtsg` read from the page, high-DPR hints for full-resolution candidates)
+  2. Legacy REST media info (now detects the homepage redirect instead of parsing HTML as JSON)
+  3. Embedded page JSON (`xdt_api__v1__media__shortcode__web_info`)
+  The last method that succeeded is tried first next time, so a dead method costs at most one extra request.
+- **Story videos with audio**: Stories now resolve from the story page's embedded `xdt_api__v1__feed__reels_media` data (matched by story ID, or by on-screen asset ID for highlights), giving the progressive MP4 with audio. CDN interception is only the last resort.
+- **New Instagram URL shapes**: `/{username}/p/{code}/`, `/{username}/reel/{code}/` and `/reels/{code}/` are now recognised everywhere (author, file type, "Download All" on profile post dialogs).
+- **`publish.js`**: looked for the pre-rename zip name (`just-ig-downloader-*`) and could never find the build output.
+
+### Added
+- **"Download All" includes videos**: carousel videos are downloaded alongside images (`_01`, `_02`, … in carousel order).
+- Unit tests (`node --test test/*.test.js`) for URL parsing, token/JSON extraction, and the resolver chain with a mocked network.
+- Console diagnostics: `[JIVD] resolver: graphql|rest|embedded|story-*` shows which method resolved each item.
+
+### Changed
+- Pure parsing helpers moved to `src/ig-resolver.js` (loaded before `src/content.js`).
+- One MutationObserver instead of two; media elements that already have a live button are skipped without layout reads, and load listeners are no longer re-attached on every scan.
+- Firefox: same-origin Instagram requests use `content.fetch` so they carry the page's own origin.
+
+---
+
 ## [4.0] - 2026-08-06
 
 ### Changed

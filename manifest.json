@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Just Image & Video Downloader",
-  "version": "4.0",
+  "version": "4.1",
   "description": "One-click image & video downloader with original quality, batch download, duplicate protection, and custom filenames.",
   "icons": {
     "48": "icons/icon48.png",
@@ -26,6 +26,7 @@
         "*://*.threads.com/*"
       ],
       "js": [
+        "src/ig-resolver.js",
         "src/content.js"
       ],
       "css": [

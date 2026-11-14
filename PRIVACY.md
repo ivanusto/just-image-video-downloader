@@ -1,6 +1,6 @@
 # Privacy Policy — Just Image & Video Downloader
 
-**Effective date:** August 7, 2026
+**Effective date:** November 14, 2026
 **Applies to:** Just Image & Video Downloader browser extension, v4.0 and later (Chrome Web Store and Firefox Add-ons editions)
 
 ## Summary
@@ -27,7 +27,7 @@ This data never leaves your device. Uninstalling the extension permanently delet
 
 ## Network Activity
 
-The extension's only network activity is fetching the image or video file you explicitly clicked to download, directly from the website's own content servers (the same servers your browser already loads that media from). It observes media requests on supported pages solely to resolve the highest-quality file URL; the content of these requests is processed locally and never recorded or transmitted elsewhere.
+The extension's only network activity is fetching the image or video file you explicitly clicked to download, directly from the website's own content servers (the same servers your browser already loads that media from). On Instagram, to find the original-quality file, it first asks Instagram itself for that post's media details, using the same requests the Instagram web page makes and the session tokens Instagram has already placed in that page (CSRF cookie and page token). These requests go only to instagram.com, are made only when you click a download button or open a multi-item post, and their content is never stored or sent anywhere else. It observes media requests on supported pages solely to resolve the highest-quality file URL; the content of these requests is processed locally and never recorded or transmitted elsewhere.
 
 ## Permissions
 

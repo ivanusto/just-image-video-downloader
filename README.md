@@ -50,6 +50,12 @@ Requires [Node.js](https://nodejs.org/) (no external dependencies required).
 node build.js
 ```
 
+Run the unit tests (Node 18+):
+
+```bash
+node --test test/*.test.js
+```
+
 Running `build.js` produces under `dist/`:
 - `dist/chrome/` & `dist/firefox/` — Unpacked extension builds
 - `just-image-video-downloader-chrome-v<version>.zip` — Store-ready Chrome package
@@ -73,9 +79,11 @@ Click the extension icon in your browser toolbar to open the settings popup:
 ## 🔍 How It Works
 
 1. **Content Script Injection**: A content script injects high-visibility blue download buttons into media elements on supported sites.
-2. **Media Resolution**:
-   - **Posts**: Calls the site's public web media-info API to fetch maximum uncompressed resolution candidates (`image_versions2`).
-   - **Fallbacks**: Resolves via high-res DOM `srcset` or intercepting video CDN streams (`.mp4`).
+2. **Media Resolution** (Instagram, tried in order; the last method that worked goes first next time):
+   - **GraphQL** `PolarisPostRootQuery` on instagram.com: original-resolution `image_versions2` / progressive `video_versions`.
+   - **Legacy REST** media info, when the session still serves it.
+   - **Embedded page JSON** (`xdt_api__v1__media__shortcode__web_info`; for stories `xdt_api__v1__feed__reels_media`, which yields videos with audio).
+   - **Fallbacks**: high-res DOM `srcset`, or intercepting video CDN streams (`.mp4`). Threads uses these directly.
 3. **Blob Downloading**: Media is fetched directly to a browser `Blob` and processed through `chrome.downloads`, bypassing CORS and referrer blocking.
 4. **Duplicate Protection**: Downloaded asset IDs are cached in `chrome.storage.local` to prevent accidental duplicate downloads.
 
@@ -100,6 +108,7 @@ Full policy: [`PRIVACY.md`](PRIVACY.md) — this is the privacy policy URL submi
 
 ## 📝 Recent Updates & Changelog
 
+- **v4.1**: New Instagram resolver chain (GraphQL → REST → embedded JSON) after Instagram's media-info API change; story videos with audio; `/{user}/p/` and `/reels/` URL support; "Download All" includes carousel videos; lighter DOM scanning.
 - **v4.0**: Renamed to **Just Image & Video Downloader** with a new icon, new brand-blue UI color, and original illustrative store assets. Functionality unchanged.
 - **v3.5**: Added Chromium blob filename fix, Duplicate Download Protection, smart batch skipping, and optimized DOM rendering scans.
 - **v3.3**: Refactored download core (`downloadViaBlob`), added performance improvements with `closest()`, updated documentation.

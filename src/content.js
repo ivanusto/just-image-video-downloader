@@ -1,4 +1,7 @@
 // Just Image & Video Downloader — content script
+// 依賴 src/ig-resolver.js（manifest 中排在本檔之前載入）提供的純函式：
+// parseIgPath、shortcodeFromHref、shortcodeToMediaId、extractFbDtsg、extractEmbeddedJson、
+// postItemFromWebInfo、storyItemFromReelsMedia、pickBestVersion、igAssetStem、mediaKey
 const chromeAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 // 跨檔共用的常數（popup.js 另有一份相同預設值；兩者執行於不同腳本環境，無法共享模組）
@@ -18,10 +21,18 @@ function debounce(fn, wait) {
 // 平台偵測：同一支腳本同時支援 Instagram 與 Threads。
 // 兩者都是 Meta 的 React SPA，圖片/影片共用 cdninstagram / fbcdn CDN，
 // 下載核心（解析網址 → blob → background 下載）完全共用；
-// IG 專屬功能（media info API、限時動態、一鍵下載全部）以 IS_IG 包起來。
+// IG 專屬功能（貼文解析鏈、限時動態、一鍵下載全部）以 IS_IG 包起來。
 const HOST = location.hostname;
 const IS_IG = /(^|\.)instagram\.com$/i.test(HOST);
 const IS_THREADS = /(^|\.)threads\.(net|com)$/i.test(HOST);
+
+// 對 IG 自身（同源）的請求：Firefox 的 content script 用 content.fetch 才會以頁面身分送出
+// （Origin / Referer 為 instagram.com，與網站自己的請求一致）；Chrome 的 fetch 本來就是如此。
+// CDN 媒體檔的下載不走這裡，維持一般 fetch。
+const igFetch = (typeof browser !== 'undefined' && typeof content !== 'undefined' &&
+                 content && typeof content.fetch === 'function')
+  ? content.fetch.bind(content)
+  : fetch.bind(window);
 
 // 使用者設定（popup 可調整按鈕位置與檔名格式）
 const settings = {
@@ -76,27 +87,10 @@ function getBestImageUrl(img) {
   return img.currentSrc || img.src;
 }
 
-// 從 IG CDN 網址擷取「資產編號」(如 722996781_122134742631040146_1843618352848331808)
-// 同一張照片不論解析度/格式都共用此編號，可用來精準對應輪播中的某一張
-function igAssetStem(url) {
-  try {
-    const path = new URL(url, location.href).pathname;
-    const m = path.match(/\/(\d+_\d+_\d+)_[a-z]+\.[a-z0-9]+/i);
-    return m ? m[1] : null;
-  } catch (e) {}
-  return null;
-}
-
-// 由下載網址推導重複比對用的 key：優先用資產編號，
-// 退而求其次用 CDN 路徑最後一段檔名（影片 mp4 的長雜湊名亦穩定）
-function mediaKey(url) {
-  if (!url || url.startsWith('blob:')) return null;
-  const stem = igAssetStem(url);
-  if (stem) return stem;
-  try {
-    const base = new URL(url, location.href).pathname.split('/').pop();
-    if (base) return base;
-  } catch (e) {}
+// 媒體元素本身的資產編號（圖片看實際顯示那張，影片看封面 poster）
+function elementStem(el) {
+  if (el?.tagName === 'IMG') return igAssetStem(getBestImageUrl(el), location.href);
+  if (el?.tagName === 'VIDEO' && el.poster) return igAssetStem(el.poster, location.href);
   return null;
 }
 
@@ -133,16 +127,16 @@ function confirmRedownload(key, kindLabel) {
 // 從 URL 偵測圖片副檔名（IG 現在會輸出 webp / heic 等格式）
 function getImageExt(url) {
   try {
-    const m = new URL(url, location.href).pathname.match(/\.(jpe?g|png|webp|gif|avif)$/i);
+    const m = new URL(url, location.href).pathname.match(/\.(jpe?g|png|webp|gif|avif|heic)$/i);
     if (m) return m[1].toLowerCase().replace('jpeg', 'jpg');
   } catch (e) {}
   return 'jpg';
 }
 
-// 從媒體元素往上找所屬 article 中貼文作者的 username
+// 從媒體元素往上找所屬 article 中貼文作者的 username（解析鏈全部失敗時的最後後備）
 function getUsernameFromMedia(el) {
-  const storyMatch = location.pathname.match(/^\/stories\/([^/]+)\//);
-  if (storyMatch) return storyMatch[1];
+  const route = parseIgPath(location.pathname);
+  if (route.username) return route.username;
 
   try {
     const article = el.closest('article') || el.closest('[role="dialog"]') || document;
@@ -180,31 +174,23 @@ function getThreadsUsername(el) {
   return 'threads';
 }
 
-// 產生檔案名稱（預設格式: {username}_{type}_{timestamp}.{ext}，可由設定頁調整）
-// IG 帳號名稱優先用 media info API：單篇貼文頁（/p/...）沒有 <article> 包裹，
-// DOM 推斷會誤抓左側導覽列「自己」的個人連結，API 才拿得到真正的作者
-async function getFilename(el, ext) {
+// 產生檔案名稱（預設格式: {username}_{type}_{timestamp}.{ext}，可由設定頁調整）。
+// IG 的帳號名稱以解析鏈拿到的 item.user 為準：單篇貼文頁沒有 <article> 包裹，
+// DOM 推斷會誤抓左側導覽列「自己」的個人連結。
+function filenameFor(el, ext, { item = null, username = null } = {}) {
   if (IS_THREADS) {
     return buildFilename(getThreadsUsername(el), 'threads', ext);
   }
 
-  let username = null;
-  const storyMatch = location.pathname.match(/^\/stories\/([^/]+)\//);
-  if (storyMatch) {
-    username = storyMatch[1];
-  } else {
-    const item = await fetchMediaInfo(findMediaId(el));
-    username = item?.user?.username ?? getUsernameFromMedia(el);
-  }
+  const route = parseIgPath(location.pathname);
+  const name = username || item?.user?.username || item?.owner?.username ||
+               route.username || getUsernameFromMedia(el);
 
   let type = 'post';
-  if (location.pathname.includes('/stories/')) {
-    type = 'story';
-  } else if (location.pathname.includes('/reel/') || location.pathname.includes('/reels/')) {
-    type = 'reel';
-  }
+  if (route.kind === 'story') type = 'story';
+  else if (route.kind === 'reel' || item?.product_type === 'clips') type = 'reel';
 
-  return buildFilename(username, type, ext);
+  return buildFilename(name, type, ext);
 }
 
 // 套用檔名樣板（批次下載會帶序號 suffix，如 _01、_02）
@@ -218,74 +204,283 @@ function buildFilename(username, type, ext, suffix = '') {
   return `${name}.${ext}`;
 }
 
-// IG shortcode → numeric media_id（IG 自訂 base64 字典）
-function shortcodeToMediaId(shortcode) {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  let id = 0n;
-  for (const ch of shortcode) {
-    const v = alphabet.indexOf(ch);
-    if (v < 0) return null;
-    id = id * 64n + BigInt(v);
+// 由 DOM / URL 推斷媒體所屬貼文的 shortcode。
+// 1. 包住媒體本身的連結（個人頁/探索頁網格縮圖就是 <a> 直接包 <img>）
+// 2. 彈窗或單篇頁（沒有 <article>）：以網址為準，避免抓到下方「更多貼文」的連結
+// 3. 動態牆：所屬 article 內的貼文連結（時間戳記連結）
+// 4. 最後用目前網址
+const POST_LINK_SEL = 'a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"], a[href*="/tv/"]';
+function findShortcode(el) {
+  const selfLink = el.closest?.(POST_LINK_SEL);
+  const fromSelf = shortcodeFromHref(selfLink?.getAttribute('href'));
+  if (fromSelf) return fromSelf;
+
+  const route = parseIgPath(location.pathname);
+  const article = el.closest?.('article');
+  const inDialog = !!el.closest?.('[role="dialog"]');
+  if (route.shortcode && (inDialog || !article)) return route.shortcode;
+
+  const container = article || el.closest?.('[role="dialog"]');
+  if (container) {
+    for (const a of container.querySelectorAll(POST_LINK_SEL)) {
+      const sc = shortcodeFromHref(a.getAttribute('href'));
+      if (sc) return sc;
+    }
   }
-  return id.toString();
-}
-
-// 由 DOM / URL 推斷 media_id
-function findMediaId(el) {
-  const story = location.pathname.match(/^\/stories\/[^/]+\/(\d+)/);
-  if (story) return story[1];
-
-  // 優先找包住媒體本身的連結（個人頁/探索頁網格縮圖就是 <a> 直接包 <img>），
-  // 再退回所屬 article / dialog，最後才用目前網址
-  const selfLink = el.closest('a[href*="/p/"], a[href*="/reel/"], a[href*="/tv/"]');
-  const article = el.closest('article') || el.closest('[role="dialog"]') || document;
-  const link = selfLink || article.querySelector('a[href*="/p/"], a[href*="/reel/"], a[href*="/tv/"]');
-  const href = link?.getAttribute('href') ?? location.pathname;
-  const m = href.match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
-  return m ? shortcodeToMediaId(m[1]) : null;
+  return route.shortcode;
 }
 
 // 找輪播中「目前顯示」的索引
-function findCarouselIndex(video) {
-  const list = video.closest('ul') || video.closest('[role="presentation"]');
+function findCarouselIndex(el) {
+  const list = el.closest('ul') || el.closest('[role="presentation"]');
   if (!list) return 0;
   const items = list.querySelectorAll('li, [role="listitem"]');
   for (let i = 0; i < items.length; i++) {
-    if (items[i].contains(video)) return i;
+    if (items[i].contains(el)) return i;
   }
   return 0;
 }
 
-// 呼叫 IG web API 取得貼文完整資訊（含作者、原始解析度圖片、progressive MP4）
-// 以 media_id 快取，下載圖檔與產生檔名共用同一筆回應
-const mediaInfoCache = new Map();
-async function fetchMediaInfo(mediaId) {
+// ---------------------------------------------------------------------------
+// IG 貼文解析鏈
+// 2026 年 8 月起 /api/v1/media/<id>/info/ 對部分工作階段會改導向首頁，
+// 因此改為依序嘗試：GraphQL PolarisPostRootQuery → 舊 REST → 頁面內嵌 JSON。
+// 三者回傳的 item 結構相同（image_versions2 / video_versions / carousel_media / user），
+// 下游的輪播比對與挑最高解析度邏輯不需區分來源。
+// 最近一次成功的方法會排到最前面，失效的方法不會每次都白打一輪。
+// ---------------------------------------------------------------------------
+const IG_APP_ID = '936619743392459';
+// PolarisPostRootQuery 的 persisted query id。IG 改版時會失效（回 errors），
+// 屆時解析鏈會自動退到 REST / 內嵌 JSON，更新此常數即可恢復。
+const IG_POST_ROOT_DOC_ID = '27852811784380813';
+
+function getCsrfToken() {
+  const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
+function isJsonResponse(res) {
+  return (res.headers.get('content-type') || '').includes('json');
+}
+
+// fb_dtsg：先從目前頁面的 script 取，沒有再抓一次首頁 HTML；成功快取 1 小時，失敗 60 秒內不重抓
+let dtsgCache = { token: null, ts: 0 };
+async function getFbDtsg(force = false) {
+  const age = Date.now() - dtsgCache.ts;
+  if (!force && dtsgCache.token && age < 3600e3) return dtsgCache.token;
+  if (!force && !dtsgCache.token && dtsgCache.ts && age < 60e3) return null;
+
+  let token = null;
+  for (const s of document.scripts) {
+    const t = s.textContent;
+    if (t && (t.includes('DTSG') || t.includes('dtsg'))) {
+      token = extractFbDtsg(t);
+      if (token) break;
+    }
+  }
+  if (!token) {
+    try {
+      const res = await igFetch(`${location.origin}/`, {
+        credentials: 'include',
+        headers: { accept: 'text/html' }
+      });
+      if (res.ok) token = extractFbDtsg(await res.text());
+    } catch (e) {}
+  }
+  dtsgCache = { token, ts: Date.now() };
+  return token;
+}
+
+async function fetchPostViaGraphql(shortcode, retry = true) {
+  const dtsg = await getFbDtsg(!retry);
+  if (!dtsg) return null;
+
+  const body = new URLSearchParams({
+    fb_dtsg: dtsg,
+    fb_api_caller_class: 'RelayModern',
+    fb_api_req_friendly_name: 'PolarisPostRootQuery',
+    doc_id: IG_POST_ROOT_DOC_ID,
+    variables: JSON.stringify({
+      shortcode,
+      __relay_internal__pv__PolarisShortDramaEnabledrelayprovider: false,
+      __relay_internal__pv__PolarisMultiCaptionCarouselEnabledrelayprovider: false
+    }),
+    server_timestamps: 'true'
+  });
+
+  const res = await igFetch(`${location.origin}/graphql/query`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      'x-fb-friendly-name': 'PolarisPostRootQuery',
+      'x-csrftoken': getCsrfToken(),
+      'x-ig-app-id': IG_APP_ID,
+      'x-requested-with': 'XMLHttpRequest',
+      // 讓 IG 回傳高 DPR 的圖片候選（Sec-Ch-* 是瀏覽器禁止自訂的標頭，只能送這兩個）
+      'dpr': '3',
+      'viewport-width': '3840'
+    },
+    body: body.toString()
+  });
+
+  const json = (res.ok && isJsonResponse(res)) ? await res.json().catch(() => null) : null;
+  const item = postItemFromWebInfo(json?.data?.xdt_api__v1__media__shortcode__web_info);
+  // fb_dtsg 過期時 IG 回 errors 或非 JSON：清快取、重抓 token 再試一次
+  if (!item && retry && (!json || json.errors)) return fetchPostViaGraphql(shortcode, false);
+  return item;
+}
+
+// 舊 REST：仍對部分工作階段有效。被改導向首頁時 res.redirected 為 true、內容是 HTML
+async function fetchItemViaRest(mediaId) {
   if (!mediaId) return null;
-  if (mediaInfoCache.has(mediaId)) return mediaInfoCache.get(mediaId);
-  try {
-    const res = await fetch(`https://www.instagram.com/api/v1/media/${mediaId}/info/`, {
-      headers: { 'x-ig-app-id': '936619743392459' },
-      credentials: 'include'
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const item = data.items?.[0] ?? null;
-    if (item) {
-      mediaInfoCache.set(mediaId, item);
-      if (mediaInfoCache.size > 50) {
-        mediaInfoCache.delete(mediaInfoCache.keys().next().value);
+  const res = await igFetch(`${location.origin}/api/v1/media/${mediaId}/info/`, {
+    credentials: 'include',
+    headers: {
+      'x-ig-app-id': IG_APP_ID,
+      'x-csrftoken': getCsrfToken(),
+      'x-requested-with': 'XMLHttpRequest'
+    }
+  });
+  if (!res.ok || res.redirected || !isJsonResponse(res)) return null;
+  const data = await res.json().catch(() => null);
+  return data?.items?.[0] ?? null;
+}
+
+// 目前頁面 <script type="application/json"> 中的 Relay 預載資料
+function scanDocumentFor(key) {
+  for (const s of document.querySelectorAll('script[type="application/json"]')) {
+    const t = s.textContent;
+    if (!t || !t.includes(key)) continue;
+    const v = extractEmbeddedJson(t, key);
+    if (v) return v;
+  }
+  return null;
+}
+
+// 抓同源頁面 HTML 取內嵌資料（SPA 切頁後目前 document 不會有新頁面的預載資料）
+async function fetchPageJson(path, key) {
+  const res = await igFetch(`${location.origin}${path}`, {
+    credentials: 'include',
+    headers: { accept: 'text/html' }
+  });
+  if (!res.ok) return null;
+  return extractEmbeddedJson(await res.text(), key);
+}
+
+const WEB_INFO_KEY = 'xdt_api__v1__media__shortcode__web_info';
+async function fetchPostViaEmbedded(shortcode) {
+  const local = postItemFromWebInfo(scanDocumentFor(WEB_INFO_KEY));
+  if (local && local.code === shortcode) return local;
+  return postItemFromWebInfo(await fetchPageJson(`/p/${shortcode}/`, WEB_INFO_KEY));
+}
+
+const POST_METHODS = {
+  graphql: (sc) => fetchPostViaGraphql(sc),
+  rest: (sc) => fetchItemViaRest(shortcodeToMediaId(sc)),
+  embedded: (sc) => fetchPostViaEmbedded(sc)
+};
+let postMethodOrder = ['graphql', 'rest', 'embedded'];
+
+const postCache = new Map();    // shortcode -> item（最多 50 筆）
+const postInflight = new Map(); // shortcode -> Promise（同一次點擊內多處呼叫只發一次請求）
+
+function isUsableItem(item) {
+  return !!(item && (item.image_versions2 || item.video_versions || item.carousel_media));
+}
+
+async function resolvePost(shortcode) {
+  if (!shortcode) return null;
+  if (postCache.has(shortcode)) return postCache.get(shortcode);
+  if (postInflight.has(shortcode)) return postInflight.get(shortcode);
+
+  const p = (async () => {
+    for (const name of postMethodOrder.slice()) {
+      try {
+        const item = await POST_METHODS[name](shortcode);
+        if (isUsableItem(item)) {
+          console.debug(`[JIVD] resolver: ${name}`, shortcode);
+          if (postMethodOrder[0] !== name) {
+            postMethodOrder = [name, ...postMethodOrder.filter(n => n !== name)];
+          }
+          postCache.set(shortcode, item);
+          if (postCache.size > 50) postCache.delete(postCache.keys().next().value);
+          return item;
+        }
+      } catch (e) {
+        console.debug(`[JIVD] resolver: ${name} failed`, e);
       }
     }
-    return item;
-  } catch (e) {
-    console.warn('IG API fetch failed:', e);
+    console.debug('[JIVD] resolver: none', shortcode);
     return null;
+  })();
+
+  postInflight.set(shortcode, p);
+  try {
+    return await p;
+  } finally {
+    postInflight.delete(shortcode);
   }
 }
 
-// 依版本清單挑最高解析度的網址
-function pickBestVersion(versions) {
-  return versions?.slice().sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0]?.url ?? null;
+// ---------------------------------------------------------------------------
+// 限時動態解析：限動頁 HTML 內嵌 xdt_api__v1__feed__reels_media（含 progressive MP4 與原圖），
+// 以網址中的 story pk 比對，精選動態（highlights）網址不帶 pk，改用畫面上媒體的資產編號比對。
+// 影片因此能拿到含音訊的檔案，CDN 攔截只剩最後後備（那條只抓得到無音訊的 DASH 視訊軌）。
+// ---------------------------------------------------------------------------
+const REELS_MEDIA_KEYS = ['xdt_api__v1__feed__reels_media', 'xdt_api__v1__feed__reels_media__connection'];
+const storyPageCache = new Map(); // 頁面路徑 -> reels_media 資料（最多 10 筆）
+
+function findStoryInData(data, query) {
+  return data ? storyItemFromReelsMedia(data, query) : null;
+}
+
+async function resolveStoryItem(el) {
+  const route = parseIgPath(location.pathname);
+  const isHighlight = /^\/stories\/highlights\//.test(location.pathname);
+  const query = { pk: isHighlight ? null : route.storyPk, stem: elementStem(el) };
+  if (!query.pk && !query.stem) return null;
+
+  // 1. 目前頁面的預載資料
+  for (const key of REELS_MEDIA_KEYS) {
+    const hit = findStoryInData(scanDocumentFor(key), query);
+    if (hit) { console.debug('[JIVD] resolver: story-embedded'); return hit; }
+  }
+
+  // 2. 抓限動頁 HTML（同一路徑快取，連續看同一人的限動不重抓）
+  const path = (!isHighlight && route.username && route.storyPk)
+    ? `/stories/${route.username}/${route.storyPk}/`
+    : location.pathname;
+  try {
+    let data = storyPageCache.get(path);
+    if (!data) {
+      for (const key of REELS_MEDIA_KEYS) {
+        data = await fetchPageJson(path, key);
+        if (data) break;
+      }
+      if (data) {
+        storyPageCache.set(path, data);
+        if (storyPageCache.size > 10) storyPageCache.delete(storyPageCache.keys().next().value);
+      }
+    }
+    const hit = findStoryInData(data, query);
+    if (hit) { console.debug('[JIVD] resolver: story-page'); return hit; }
+  } catch (e) {
+    console.debug('[JIVD] resolver: story-page failed', e);
+  }
+
+  // 3. 舊 REST（限動 pk 也是 media id）
+  if (query.pk) {
+    try {
+      const item = await fetchItemViaRest(query.pk);
+      if (isUsableItem(item)) {
+        console.debug('[JIVD] resolver: story-rest');
+        return { item, username: item.user?.username ?? null };
+      }
+    } catch (e) {}
+  }
+  console.debug('[JIVD] resolver: story none');
+  return null;
 }
 
 // 取得輪播中對應目前元素的子項目（非輪播則回傳貼文本身）
@@ -295,10 +490,7 @@ function getCarouselItem(item, el) {
   // 優先用點擊媒體的 CDN 資產編號精準比對：
   // DOM 的 <li> 索引會因 IG 預載前後張、首張前塞隱藏佔位而偏移（常 +1），
   // 改用使用者實際看到那張圖（影片則用封面 poster）的編號去找，最可靠
-  let stem = null;
-  if (el?.tagName === 'IMG') stem = igAssetStem(getBestImageUrl(el));
-  else if (el?.tagName === 'VIDEO') stem = igAssetStem(el.poster);
-
+  const stem = elementStem(el);
   if (stem) {
     const match = item.carousel_media.find(m =>
       m.image_versions2?.candidates?.some(c => (c.url || '').includes(stem))
@@ -311,11 +503,9 @@ function getCarouselItem(item, el) {
   return item.carousel_media[idx] ?? item.carousel_media[0];
 }
 
-// 取得 progressive MP4（含音訊）
-async function fetchVideoUrlFromApi(mediaId, video) {
-  const item = await fetchMediaInfo(mediaId);
+// 從解析結果取 progressive MP4（含音訊）
+function videoUrlFromItem(item, video) {
   if (!item) return null;
-
   if (item.video_versions?.length) return pickBestVersion(item.video_versions);
 
   if (item.carousel_media?.length) {
@@ -344,28 +534,33 @@ async function fetchVideoUrlFromCdn(video) {
 }
 
 // 圖片下載（點擊當下才解析最佳網址，避免輪播切換後抓到舊圖）
-// 優先用 media info API 的原始解析度圖（srcset 通常最高只有 1080p）
+// IG 優先用解析鏈的原始解析度圖（srcset 通常最高只有 1080p）
 async function downloadImage(img) {
   try {
-    let url = null;
-    // IG 才有 media info API（取原始解析度 + 精準對應輪播那張）；
-    // Threads 沒有等價 REST API，直接用 srcset 取最高解析度。
+    let url = null, item = null, username = null;
+    // Threads 沒有等價 API，直接用 srcset 取最高解析度。
     if (IS_IG) {
-      const item = await fetchMediaInfo(findMediaId(img));
-      if (item) {
-        const target = getCarouselItem(item, img);
-        url = pickBestVersion(target?.image_versions2?.candidates);
+      if (parseIgPath(location.pathname).kind === 'story') {
+        const hit = await resolveStoryItem(img);
+        if (hit) {
+          item = hit.item;
+          username = hit.username;
+          url = pickBestVersion(hit.item.image_versions2?.candidates);
+        }
+      } else {
+        item = await resolvePost(findShortcode(img));
+        if (item) url = pickBestVersion(getCarouselItem(item, img)?.image_versions2?.candidates);
       }
     }
     if (!url) url = getBestImageUrl(img);
 
     // 重複下載偵測：同一張圖（資產編號相同）已下載過就先詢問
-    const key = mediaKey(url);
+    const key = mediaKey(url, location.href);
     if (key && downloadedMedia.has(key) && !confirmRedownload(key, '這張圖片')) {
       return 'skipped';
     }
 
-    const filename = await getFilename(img, getImageExt(url));
+    const filename = filenameFor(img, getImageExt(url), { item, username });
     const ok = await downloadViaBlob(url, filename);
     if (ok) recordDownload(key, filename);
     return ok;
@@ -389,7 +584,7 @@ async function downloadViaBlob(url, filename) {
     const res = await chromeAPI.runtime.sendMessage({ action: 'download', url: blobUrl, filename });
     if (res?.success) return true;
   } catch (e) {
-    console.warn('[IG-DL] background download failed, falling back to anchor click');
+    console.warn('[JIVD] background download failed, falling back to anchor click');
   }
 
   // 後備：在網頁直接以 <a download> 觸發。
@@ -408,19 +603,28 @@ async function downloadViaBlob(url, filename) {
   return true;
 }
 
+// 影片檔儲存：先讓 background 直接下載 CDN 網址，失敗（多半是 CDN 回 403 / 擋 referrer）再走 blob
+async function saveVideoUrl(url, filename) {
+  try {
+    const res = await chromeAPI.runtime.sendMessage({ action: 'download', url, filename });
+    if (res?.success) return true;
+  } catch (e) {}
+  console.log('[JIVD] direct download failed, falling back to blob fetch');
+  return downloadViaBlob(url, filename);
+}
+
 // 影片下載
 async function downloadVideo(video) {
   try {
-    let url = null;
+    let url = null, item = null, username = null;
 
-    // 1. 優先檢查 video.src 是否為直接 progressive mp4（若非 blob URL 則可直接使用）
+    // 1. video.src 若是直接 progressive mp4（非 blob / MSE）就直接用
     if (video.src && !video.src.startsWith('blob:')) {
       url = video.src;
     } else if (video.currentSrc && !video.currentSrc.startsWith('blob:')) {
       url = video.currentSrc;
     } else {
-      const sources = video.querySelectorAll('source');
-      for (const s of sources) {
+      for (const s of video.querySelectorAll('source')) {
         if (s.src && !s.src.startsWith('blob:')) {
           url = s.src;
           break;
@@ -428,11 +632,18 @@ async function downloadVideo(video) {
       }
     }
 
-    // 2. 其次呼叫 IG 的 Web API（Threads 無此 API，略過直接走 CDN 攔截）
+    // 2. IG 解析鏈（Threads 無此 API，略過直接走 CDN 攔截）
     if (!url && IS_IG) {
-      const mediaId = findMediaId(video);
-      if (mediaId) {
-        url = await fetchVideoUrlFromApi(mediaId, video);
+      if (parseIgPath(location.pathname).kind === 'story') {
+        const hit = await resolveStoryItem(video);
+        if (hit) {
+          item = hit.item;
+          username = hit.username;
+          url = pickBestVersion(hit.item.video_versions);
+        }
+      } else {
+        item = await resolvePost(findShortcode(video));
+        url = videoUrlFromItem(item, video);
       }
     }
 
@@ -442,33 +653,18 @@ async function downloadVideo(video) {
     }
 
     if (!url) {
-      console.warn('Could not resolve video URL via direct src, API, or CDN interception');
+      console.warn('[JIVD] could not resolve video URL via direct src, resolver, or CDN interception');
       return false;
     }
 
     // 重複下載偵測：同一部影片已下載過就先詢問
-    const key = mediaKey(url);
+    const key = mediaKey(url, location.href);
     if (key && downloadedMedia.has(key) && !confirmRedownload(key, '這部影片')) {
       return 'skipped';
     }
 
-    const filename = await getFilename(video, 'mp4');
-
-    // 優先：透過 background 直接下載
-    const res = await chromeAPI.runtime.sendMessage({
-      action: 'download',
-      url: url,
-      filename: filename
-    });
-
-    if (res && res.success) {
-      recordDownload(key, filename);
-      return true;
-    }
-
-    // 後備：直接下載失敗（多半是 CDN 回 403 / 擋 referrer），改用 fetch-to-blob
-    console.log('[IG-DL] direct download failed, falling back to blob fetch');
-    const ok = await downloadViaBlob(url, filename);
+    const filename = filenameFor(video, 'mp4', { item, username });
+    const ok = await saveVideoUrl(url, filename);
     if (ok) recordDownload(key, filename);
     return ok;
   } catch (error) {
@@ -527,7 +723,7 @@ function createDownloadButton(onClickHandler) {
     try {
       success = await onClickHandler();
     } catch (err) {
-      console.warn('[IG-DL] download handler error:', err);
+      console.warn('[JIVD] download handler error:', err);
     }
 
     btn.classList.remove('loading');
@@ -581,41 +777,45 @@ function addStoryButton() {
   document.body.appendChild(btn);
 }
 
-// 一鍵下載貼文全部圖片：只在貼文頁（/p/...，含從用戶頁開啟的彈窗）
-// 且貼文有 2 張以上圖片時顯示；影片項目暫時跳過
-let addAllPending = false;
-async function addDownloadAllButton() {
-  if (addAllPending || document.querySelector('.ig-download-btn--all')) return;
-  const m = location.pathname.match(/^\/p\/([A-Za-z0-9_-]+)/);
-  if (!m) return;
-  const shortcode = m[1];
+// 一鍵下載貼文全部媒體：只在貼文頁（/p/...、/{user}/p/... 彈窗）
+// 且貼文有 2 項以上可下載的圖片或影片時顯示
+let addAllPendingFor = null;
+async function addDownloadAllButton(shortcode) {
+  if (addAllPendingFor === shortcode || document.querySelector('.ig-download-btn--all')) return;
 
-  addAllPending = true;
+  addAllPendingFor = shortcode;
   try {
-    const item = await fetchMediaInfo(shortcodeToMediaId(shortcode));
+    const item = await resolvePost(shortcode);
     // async 等待期間使用者可能已切換頁面或按鈕已建立
-    if (!location.pathname.startsWith(`/p/${shortcode}`)) return;
+    if (parseIgPath(location.pathname).shortcode !== shortcode) return;
     if (document.querySelector('.ig-download-btn--all')) return;
 
-    const imageItems = (item?.carousel_media?.length ? item.carousel_media : item ? [item] : [])
-      .filter(t => !t.video_versions?.length && t.image_versions2?.candidates?.length);
-    if (imageItems.length < 2) return; // 單圖貼文用原本的單張按鈕即可
+    const entries = (item?.carousel_media?.length ? item.carousel_media : item ? [item] : [])
+      .map(t => {
+        const isVideo = !!t.video_versions?.length;
+        const url = isVideo ? pickBestVersion(t.video_versions)
+                            : pickBestVersion(t.image_versions2?.candidates);
+        return url ? { url, isVideo } : null;
+      })
+      .filter(Boolean);
+    if (entries.length < 2) return; // 單一媒體用原本的單張按鈕即可
 
-    const username = item.user?.username ?? 'instagram';
-    const total = imageItems.length;
+    const username = item.user?.username ?? parseIgPath(location.pathname).username ?? 'instagram';
+    const total = entries.length;
+    const unit = entries.some(e => e.isVideo) ? '項' : '張';
+    const idleLabel = `全部 ${total} ${unit}`;
     let label = null;
 
     const btn = createDownloadButton(async () => {
       // 批次前先盤點重複：已下載過的自動略過；若全部都下載過則詢問是否整批重下
-      const urls = imageItems.map(t => pickBestVersion(t.image_versions2.candidates));
-      const dupCount = urls.filter(u => {
-        const k = mediaKey(u);
+      const dupCount = entries.filter(({ url }) => {
+        const k = mediaKey(url, location.href);
         return k && downloadedMedia.has(k);
       }).length;
       let force = false;
       if (dupCount === total) {
-        if (!window.confirm(`這 ${total} 張圖片之前都已下載過，仍要全部重新下載嗎？`)) {
-          if (label) label.textContent = `全部 ${total} 張`;
+        if (!window.confirm(`這 ${total} ${unit}之前都已下載過，仍要全部重新下載嗎？`)) {
+          if (label) label.textContent = idleLabel;
           return 'skipped';
         }
         force = true;
@@ -624,47 +824,57 @@ async function addDownloadAllButton() {
       let ok = 0, skipped = 0;
       for (let i = 0; i < total; i++) {
         if (label) label.textContent = `${i + 1}/${total}`;
+        const { url, isVideo } = entries[i];
         try {
-          const url = urls[i];
-          if (url) {
-            const key = mediaKey(url);
-            if (!force && key && downloadedMedia.has(key)) {
-              skipped++;
-              continue; // 已下載過，略過（不需節流等待）
-            }
-            const suffix = `_${String(i + 1).padStart(2, '0')}`;
-            const fn = buildFilename(username, 'post', getImageExt(url), suffix);
-            await downloadViaBlob(url, fn);
+          const key = mediaKey(url, location.href);
+          if (!force && key && downloadedMedia.has(key)) {
+            skipped++;
+            continue; // 已下載過，略過（不需節流等待）
+          }
+          const suffix = `_${String(i + 1).padStart(2, '0')}`;
+          const fn = buildFilename(username, 'post', isVideo ? 'mp4' : getImageExt(url), suffix);
+          const saved = isVideo ? await saveVideoUrl(url, fn) : await downloadViaBlob(url, fn);
+          if (saved) {
             recordDownload(key, fn);
             ok++;
           }
         } catch (e) {
-          console.warn('[IG-DL] batch item failed:', e);
+          console.warn('[JIVD] batch item failed:', e);
         }
         // 連續下載間隔，避免被瀏覽器或 CDN 節流
         await new Promise(r => setTimeout(r, 300));
       }
       if (label) {
-        label.textContent = skipped ? `新 ${ok}・略過 ${skipped}` : `全部 ${total} 張`;
+        label.textContent = skipped ? `新 ${ok}・略過 ${skipped}` : idleLabel;
       }
-      return ok + skipped === total ? true : false;
+      return ok + skipped === total;
     });
 
     btn.classList.add('ig-download-btn--all');
     btn.removeAttribute('data-corner');
     label = document.createElement('span');
     label.className = 'all-label';
-    label.textContent = `全部 ${total} 張`;
+    label.textContent = idleLabel;
     btn.insertBefore(label, btn.querySelector('.tooltip'));
     document.body.appendChild(btn);
   } finally {
-    addAllPending = false;
+    if (addAllPendingFor === shortcode) addAllPendingFor = null;
   }
+}
+
+// 每個媒體元素對應的按鈕：按鈕仍在頁面上就不再處理該元素，
+// 省掉每次掃描對同一批元素重複的 getComputedStyle / getBoundingClientRect。
+// React 重繪把按鈕移除時 isConnected 變 false，下次掃描會補回。
+const mediaButtons = new WeakMap(); // element -> button
+const waitingMedia = new WeakSet(); // 已掛上 load / loadedmetadata 監聽、等待載入的元素
+
+function hasLiveButton(el) {
+  return mediaButtons.get(el)?.isConnected === true;
 }
 
 // 增加下載按鈕到圖片元素
 function addDownloadButtonToElement(img) {
-  if (!img.parentElement) return;
+  if (!img.parentElement || hasLiveButton(img)) return;
   if (isProfilePicture(img)) return;
 
   // 決定按鈕的掛載容器，且不破壞網站既有版面。
@@ -687,65 +897,88 @@ function addDownloadButtonToElement(img) {
     }
   }
 
-  if (container.querySelector(':scope > .ig-download-btn')) return;
-  container.appendChild(createDownloadButton(() => downloadImage(img)));
+  const existing = container.querySelector(':scope > .ig-download-btn');
+  if (existing) {
+    mediaButtons.set(img, existing);
+    return;
+  }
+  const btn = createDownloadButton(() => downloadImage(img));
+  container.appendChild(btn);
+  mediaButtons.set(img, btn);
 }
 
 // 增加下載按鈕到影片元素
 function addDownloadButtonToVideo(video) {
+  if (hasLiveButton(video)) return;
   const container = video.parentElement;
-  if (!container || container.querySelector('.ig-download-btn')) return;
+  if (!container) return;
+  const existing = container.querySelector('.ig-download-btn');
+  if (existing) {
+    mediaButtons.set(video, existing);
+    return;
+  }
 
-  // 影片尚無任何來源，等待載入後重試
+  // 影片尚無任何來源，等待載入後重試（同一元素只掛一次監聽，避免每次掃描累積）
   if (!video.currentSrc && !video.src && !video.querySelector?.('source')?.src) {
-    video.addEventListener('loadedmetadata', () => addDownloadButtonToVideo(video), { once: true });
-    video.addEventListener('canplay', () => addDownloadButtonToVideo(video), { once: true });
+    if (waitingMedia.has(video)) return;
+    waitingMedia.add(video);
+    const retry = () => {
+      waitingMedia.delete(video);
+      addDownloadButtonToVideo(video);
+    };
+    video.addEventListener('loadedmetadata', retry, { once: true });
+    video.addEventListener('canplay', retry, { once: true });
     return;
   }
 
   const btn = createDownloadButton(() => downloadVideo(video));
-
   if (getComputedStyle(container).position === 'static') {
     container.style.position = 'relative';
   }
   container.appendChild(btn);
+  mediaButtons.set(video, btn);
 }
 
 // 增加下載按鈕到所有媒體元素（採用 size Heuristics 配合 class fallback 避免 IG 動態變更類名）
 function addDownloadButtons() {
+  const route = IS_IG ? parseIgPath(location.pathname) : null;
+
   // 限時動態頁面：加一顆固定按鈕，媒體在點擊當下才解析（IG 專屬，Threads 無限動）
-  if (IS_IG && /^\/stories\//.test(location.pathname)) {
+  if (route?.kind === 'story') {
     if (findStoryMedia()) addStoryButton();
     return;
   }
 
-  // 貼文頁（從用戶頁點進或彈窗開啟）：提供一鍵下載全部圖片（IG 專屬，依賴 media info API）
-  if (IS_IG && /^\/p\//.test(location.pathname)) addDownloadAllButton();
+  // 貼文頁（單篇或從個人頁開啟的彈窗）：提供一鍵下載全部（IG 專屬，依賴解析鏈）
+  if (route?.kind === 'post' && route.shortcode) addDownloadAllButton(route.shortcode);
 
   // 先處理影片
-  const videos = document.querySelectorAll('video');
-  videos.forEach(video => {
+  for (const video of document.querySelectorAll('video')) {
+    if (hasLiveButton(video) || waitingMedia.has(video)) continue;
     const rect = video.getBoundingClientRect();
-    if (rect.width < 150 || rect.height < 150) return; // 過濾小預覽圖或非主影片
+    if (rect.width < 150 || rect.height < 150) continue; // 過濾小預覽圖或非主影片
     addDownloadButtonToVideo(video);
-  });
+  }
 
   // 再處理圖片
   const images = document.querySelectorAll('img[src*="cdninstagram.com"], img[src*="fbcdn.net"], img[src*="instagram.com"]');
-  images.forEach(img => {
+  for (const img of images) {
+    if (hasLiveButton(img) || waitingMedia.has(img)) continue;
     const rect = img.getBoundingClientRect();
-    if (rect.width < 150 || rect.height < 150) return; // 過濾小圖
+    if (rect.width < 150 || rect.height < 150) continue; // 過濾小圖
 
     if (img.complete && img.naturalWidth > 150 && img.naturalHeight > 150) {
       addDownloadButtonToElement(img);
-    } else {
+    } else if (!img.complete) {
+      waitingMedia.add(img);
       img.addEventListener('load', () => {
+        waitingMedia.delete(img);
         if (img.naturalWidth > 150 && img.naturalHeight > 150) {
           addDownloadButtonToElement(img);
         }
       }, { once: true });
     }
-  });
+  }
 }
 
 // 點擊救援：IG 會在影片上蓋一層透明的播放/暫停遮罩，且影片容器常被設成
@@ -773,19 +1006,23 @@ document.addEventListener('click', (e) => {
 // 滾動與 DOM 變動共用同一個 debounce 掃描器（trailing 300ms）
 const scheduleScan = debounce(addDownloadButtons, 300);
 window.addEventListener('scroll', scheduleScan, { passive: true });
-new MutationObserver(scheduleScan).observe(document.body, { childList: true, subtree: true });
 
 // SPA 路由變更偵測：換頁時移除固定按鈕（限動/批次）後重新掃描。
-// MutationObserver 捕捉 React 換頁；popstate 另外即時涵蓋上一頁/下一頁。
+// 單一 MutationObserver 同時負責路由偵測與觸發掃描；popstate 另外即時涵蓋上一頁/下一頁。
 let lastUrl = location.href;
 function onUrlMaybeChanged() {
   if (location.href === lastUrl) return;
   lastUrl = location.href;
   document.querySelectorAll('body > .ig-download-btn').forEach(b => b.remove());
-  scheduleScan();
 }
-new MutationObserver(onUrlMaybeChanged).observe(document, { subtree: true, childList: true });
-window.addEventListener('popstate', onUrlMaybeChanged);
+new MutationObserver(() => {
+  onUrlMaybeChanged();
+  scheduleScan();
+}).observe(document.documentElement, { childList: true, subtree: true });
+window.addEventListener('popstate', () => {
+  onUrlMaybeChanged();
+  scheduleScan();
+});
 
 // 初始化：立即掃一次，再分梯次補掃——React 首屏渲染完成時間不定，
 // 早到的媒體立刻有按鈕，晚到的靠補掃與 MutationObserver 接手

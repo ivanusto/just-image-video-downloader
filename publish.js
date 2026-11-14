@@ -66,7 +66,7 @@ function loadConfig() {
 }
 
 function findZip(platform, version) {
-  const zipPath = path.join(__dirname, 'dist', `just-ig-downloader-${platform}-v${version}.zip`);
+  const zipPath = path.join(__dirname, 'dist', `just-image-video-downloader-${platform}-v${version}.zip`);
   if (!fs.existsSync(zipPath)) {
     throw new Error(`找不到 ${zipPath}，請先執行 node build.js`);
   }
