@@ -13,14 +13,14 @@ This document serves as the single source of truth for store listing copy, metad
 ### 繁體中文
 - **因應 Instagram 介面更新**：Instagram 調整後，部分帳號只能下載到 1080p、作者名稱錯誤、「全部下載」按鈕消失，本版改用新的解析方式並自動切換備援，恢復原始畫質。
 - **限時動態影片有聲音**：限時動態與精選動態影片改為下載含音訊的完整檔案。
-- **支援新網址格式**：個人頁開啟的貼文（`/帳號/p/…`）、Reels 動態（`/reels/…`）都能正確辨識作者與類型，並顯示「全部下載」。
+- **支援新網址格式**：個人頁開啟的貼文（`/帳號/p/…`）、Reels 動態（`/reels/…`）都能正確辨識作者與類型，並顯示「全部下載」；個人頁的 Reels 分頁每個項目也都有下載按鈕。
 - **「全部下載」包含影片**：多媒體輪播中的影片也會一併下載並依序編號。
 - **效能改善**：減少頁面掃描時的重複計算。
 
 ### English
 - **Instagram update compatibility**: After Instagram changed its web API, some accounts only got 1080p images, wrong author names, and no "Download All" button. v4.1 uses Instagram's newer media lookup with automatic fallbacks, restoring original quality.
 - **Story videos with audio**: Story and highlight videos now download as the complete file with sound.
-- **New URL formats**: Posts opened from profiles (`/user/p/…`) and the Reels feed (`/reels/…`) are recognised correctly, including "Download All".
+- **New URL formats**: Posts opened from profiles (`/user/p/…`) and the Reels feed (`/reels/…`) are recognised correctly, including "Download All"; every item on a profile's Reels tab now has a download button.
 - **"Download All" includes videos**: Carousel videos are saved alongside images with sequential numbering.
 - **Performance**: Less repeated work while scanning pages.
 

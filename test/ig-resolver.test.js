@@ -17,6 +17,8 @@ test('parseIgPath: 各種貼文與 reel 網址', () => {
     ['/tv/B1234/', { kind: 'reel', shortcode: 'B1234', username: null }],
     ['/reels/', { kind: 'reel', shortcode: null, username: null }],
     ['/natgeo/', { kind: 'other', shortcode: null, username: null }],
+    ['/natgeo/reels/', { kind: 'other', shortcode: null, username: null }],
+    ['/reels/audio/123456789/', { kind: 'other', shortcode: null, username: null }],
     ['/explore/', { kind: 'other', shortcode: null, username: null }],
     ['/', { kind: 'other', shortcode: null, username: null }]
   ];

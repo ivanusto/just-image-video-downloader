@@ -875,6 +875,8 @@ function hasLiveButton(el) {
 // 增加下載按鈕到圖片元素
 function addDownloadButtonToElement(img) {
   if (!img.parentElement || hasLiveButton(img)) return;
+  // 所在的貼文格子已經掛了格子按鈕（圖片比格子掃描晚載入時）：不再重複掛
+  if (img.closest('a')?.querySelector(':scope > .ig-download-btn')) return;
   if (isProfilePicture(img)) return;
 
   // 決定按鈕的掛載容器，且不破壞網站既有版面。
@@ -978,6 +980,70 @@ function addDownloadButtons() {
         }
       }, { once: true });
     }
+  }
+
+  // 最後處理「貼文連結格子」：個人頁 Reels 分頁（/{user}/reels/）的縮圖不是 <img>，
+  // 而是畫成背景圖的格子，上面兩段掃描抓不到。格子本身就是指向 /reel/{code}/ 的連結，
+  // 有 shortcode 就能走解析鏈。格子內若有夠大的 CDN <img>，交給圖片路徑處理，避免重複按鈕。
+  if (IS_IG) {
+    for (const a of document.querySelectorAll(POST_LINK_SEL)) {
+      if (hasLiveButton(a)) continue;
+      if (a.querySelector('.ig-download-btn')) continue;
+      const shortcode = shortcodeFromHref(a.getAttribute('href'));
+      if (!shortcode) continue;
+      const rect = a.getBoundingClientRect();
+      if (rect.width < 150 || rect.height < 150) continue;
+      if (hasLargeCdnImage(a)) continue;
+      addDownloadButtonToTile(a, shortcode);
+    }
+  }
+}
+
+// 格子內是否有已經（或即將）由圖片路徑處理的 CDN 縮圖
+function hasLargeCdnImage(el) {
+  for (const img of el.querySelectorAll('img')) {
+    const src = img.currentSrc || img.src || '';
+    if (!/cdninstagram\.com|fbcdn\.net|instagram\.com/.test(src)) continue;
+    const r = img.getBoundingClientRect();
+    if (r.width >= 150 && r.height >= 150) return true;
+  }
+  return false;
+}
+
+function addDownloadButtonToTile(anchor, shortcode) {
+  if (getComputedStyle(anchor).position === 'static') {
+    anchor.style.position = 'relative';
+  }
+  // 按鈕在 <a> 內：按鈕的 click handler 會 preventDefault，不會觸發連結換頁
+  const btn = createDownloadButton(() => downloadPostTile(anchor, shortcode));
+  anchor.appendChild(btn);
+  mediaButtons.set(anchor, btn);
+}
+
+// 格子下載：格子顯示的是貼文封面，reel 下載影片本體，輪播取第一項，其餘取最高解析度圖
+async function downloadPostTile(anchor, shortcode) {
+  try {
+    const item = await resolvePost(shortcode);
+    if (!item) return false;
+    const first = item.carousel_media?.[0] ?? item;
+    const videoVersions = item.video_versions?.length ? item.video_versions : first.video_versions;
+    const isVideo = !!videoVersions?.length;
+    const url = isVideo ? pickBestVersion(videoVersions)
+                        : pickBestVersion(first.image_versions2?.candidates);
+    if (!url) return false;
+
+    const key = mediaKey(url, location.href);
+    if (key && downloadedMedia.has(key) && !confirmRedownload(key, isVideo ? '這部影片' : '這張圖片')) {
+      return 'skipped';
+    }
+
+    const filename = filenameFor(anchor, isVideo ? 'mp4' : getImageExt(url), { item });
+    const ok = isVideo ? await saveVideoUrl(url, filename) : await downloadViaBlob(url, filename);
+    if (ok) recordDownload(key, filename);
+    return ok;
+  } catch (error) {
+    console.error('Tile download failed:', error);
+    return false;
   }
 }
 

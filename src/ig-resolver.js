@@ -29,7 +29,8 @@ function parseIgPath(pathname) {
   }
 
   const m = path.match(/^\/(?:([A-Za-z0-9_.]+)\/)?(p|reels?|tv)\/([A-Za-z0-9_-]+)/);
-  if (m && !(m[1] && IG_RESERVED_PATHS.has(m[1]))) {
+  // /reels/audio/{id}/ 是音樂頁，不是貼文
+  if (m && !(m[1] && IG_RESERVED_PATHS.has(m[1])) && m[3] !== 'audio') {
     out.kind = m[2] === 'p' ? 'post' : 'reel';
     out.shortcode = m[3];
     if (m[1]) out.username = m[1];

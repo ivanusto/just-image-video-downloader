@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The last method that succeeded is tried first next time, so a dead method costs at most one extra request.
 - **Story videos with audio**: Stories now resolve from the story page's embedded `xdt_api__v1__feed__reels_media` data (matched by story ID, or by on-screen asset ID for highlights), giving the progressive MP4 with audio. CDN interception is only the last resort.
 - **New Instagram URL shapes**: `/{username}/p/{code}/`, `/{username}/reel/{code}/` and `/reels/{code}/` are now recognised everywhere (author, file type, "Download All" on profile post dialogs).
+- **Profile Reels tab (`/{username}/reels/`)**: grid tiles there are not `<img>` elements, so no download buttons appeared. Post-link tiles without a usable thumbnail image now get their own button, which resolves the reel by shortcode and saves the video.
 - **`publish.js`**: looked for the pre-rename zip name (`just-ig-downloader-*`) and could never find the build output.
 
 ### Added
